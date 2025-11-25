@@ -1,0 +1,17 @@
+# 开发环境配置
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/water_management?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 
+
+logging:
+  level:
+    root: INFO
+    com.waterworks: DEBUG
+
+
