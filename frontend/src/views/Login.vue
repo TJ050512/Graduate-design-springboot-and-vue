@@ -1,34 +1,61 @@
 <template>
   <div class="login-container">
-    <div class="login-box">
-      <div class="login-header">
-        <h2>水务管理系统</h2>
-        <p>Water Management System</p>
+    <!-- 动态背景 -->
+    <div class="bg-animation">
+      <div class="wave wave1"></div>
+      <div class="wave wave2"></div>
+      <div class="wave wave3"></div>
+    </div>
+    
+    <!-- 浮动水滴装饰 -->
+    <div class="floating-drops">
+      <div class="drop" v-for="n in 8" :key="n" :style="getDropStyle(n)"></div>
+    </div>
+    
+    <!-- 登录卡片 -->
+    <div class="login-card">
+      <div class="card-header">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="currentColor"/>
+            </svg>
+          </div>
+        </div>
+        <h1>水务管理系统</h1>
+        <p class="subtitle">Water Management System</p>
       </div>
+      
       <el-form
         ref="loginFormRef"
         :model="loginForm"
         :rules="loginRules"
         class="login-form"
+        @submit.prevent="handleLogin"
       >
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
             placeholder="请输入用户名"
             size="large"
-            prefix-icon="User"
+            :prefix-icon="User"
+            class="custom-input"
           />
         </el-form-item>
+        
         <el-form-item prop="password">
           <el-input
             v-model="loginForm.password"
             type="password"
             placeholder="请输入密码"
             size="large"
-            prefix-icon="Lock"
+            :prefix-icon="Lock"
+            show-password
+            class="custom-input"
             @keyup.enter="handleLogin"
           />
         </el-form-item>
+        
         <el-form-item>
           <el-button
             type="primary"
@@ -37,13 +64,33 @@
             :loading="loading"
             @click="handleLogin"
           >
-            登录
+            <span v-if="!loading">登 录</span>
+            <span v-else>登录中...</span>
           </el-button>
         </el-form-item>
       </el-form>
-      <div class="login-footer">
-        <p>默认账号：admin / admin123</p>
+      
+      <div class="card-footer">
+        <div class="divider">
+          <span>测试账号</span>
+        </div>
+        <div class="test-accounts">
+          <div 
+            class="account-item" 
+            v-for="account in testAccounts" 
+            :key="account.username"
+            @click="fillTestAccount(account.username, account.password)"
+          >
+            <el-tag :type="account.type" effect="plain" size="small">{{ account.label }}</el-tag>
+            <span class="account-text">{{ account.username }} / {{ account.password }}</span>
+          </div>
+        </div>
       </div>
+    </div>
+    
+    <!-- 版权信息 -->
+    <div class="copyright">
+      <p>© 2024 水务管理系统 All Rights Reserved</p>
     </div>
   </div>
 </template>
@@ -52,6 +99,7 @@
 import { ref, reactive } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const loginFormRef = ref(null)
@@ -72,6 +120,34 @@ const loginRules = {
   ]
 }
 
+// 生成随机水滴样式
+const getDropStyle = (index) => {
+  const left = Math.random() * 100
+  const delay = Math.random() * 5
+  const duration = 3 + Math.random() * 4
+  const size = 10 + Math.random() * 20
+  return {
+    left: `${left}%`,
+    animationDelay: `${delay}s`,
+    animationDuration: `${duration}s`,
+    width: `${size}px`,
+    height: `${size}px`
+  }
+}
+
+// 测试账号数据（与数据库一致）
+const testAccounts = [
+  { username: 'admin', password: 'admin123', label: '管理员', type: 'danger' },
+  { username: 'user001', password: '123456', label: '普通用户', type: 'success' },
+  { username: 'reader001', password: '123456', label: '抄表员', type: 'warning' }
+]
+
+// 填充测试账号
+const fillTestAccount = (username, password) => {
+  loginForm.username = username
+  loginForm.password = password
+}
+
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   
@@ -90,52 +166,366 @@ const handleLogin = async () => {
 
 <style scoped lang="scss">
 .login-container {
+  min-height: 100vh;
   display: flex;
-  justify-content: center;
   align-items: center;
-  height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #1e3c72 100%);
 }
 
-.login-box {
-  width: 400px;
+// ==========================================
+// 动态波浪背景
+// ==========================================
+.bg-animation {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.wave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  background-repeat: repeat-x;
+  transform-origin: center bottom;
+}
+
+.wave1 {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='rgba(255,255,255,0.1)' d='M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+  background-size: 50% 100%;
+  animation: wave 15s linear infinite;
+  opacity: 0.8;
+}
+
+.wave2 {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='rgba(255,255,255,0.05)' d='M0,64L48,80C96,96,192,128,288,128C384,128,480,96,576,90.7C672,85,768,107,864,144C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+  background-size: 50% 100%;
+  animation: wave 12s linear infinite reverse;
+  opacity: 0.6;
+}
+
+.wave3 {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='rgba(255,255,255,0.03)' d='M0,160L48,170.7C96,181,192,203,288,202.7C384,203,480,181,576,186.7C672,192,768,224,864,213.3C960,203,1056,149,1152,138.7C1248,128,1344,160,1392,176L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+  background-size: 50% 100%;
+  animation: wave 18s linear infinite;
+  opacity: 0.4;
+}
+
+@keyframes wave {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+// ==========================================
+// 浮动水滴
+// ==========================================
+.floating-drops {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.drop {
+  position: absolute;
+  bottom: -50px;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  border-radius: 50%;
+  animation: float-up 6s ease-in infinite;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 10%;
+    left: 20%;
+    width: 30%;
+    height: 30%;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+  }
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-100vh) scale(0.5);
+    opacity: 0;
+  }
+}
+
+// ==========================================
+// 登录卡片
+// ==========================================
+.login-card {
+  width: 420px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
   padding: 40px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2),
+              0 0 0 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 10;
+  animation: card-appear 0.6s ease-out;
+  
+  // 光晕效果
+  &::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, rgba(24, 144, 255, 0.3), rgba(64, 169, 255, 0.1), rgba(24, 144, 255, 0.3));
+    border-radius: 22px;
+    z-index: -1;
+    animation: glow 3s ease-in-out infinite alternate;
+  }
 }
 
-.login-header {
+@keyframes card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes glow {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.card-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
   
-  h2 {
-    font-size: 28px;
-    color: #333;
-    margin-bottom: 10px;
+  .logo {
+    margin-bottom: 16px;
+    
+    .logo-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+      border-radius: 16px;
+      color: white;
+      box-shadow: 0 8px 20px rgba(24, 144, 255, 0.4);
+      animation: logo-pulse 2s ease-in-out infinite;
+      
+      svg {
+        width: 36px;
+        height: 36px;
+      }
+    }
   }
   
-  p {
-    color: #999;
-    font-size: 14px;
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1e3c72;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+  
+  .subtitle {
+    font-size: 13px;
+    color: #909399;
+    letter-spacing: 1px;
   }
 }
 
+@keyframes logo-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 20px rgba(24, 144, 255, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 12px 30px rgba(24, 144, 255, 0.5);
+  }
+}
+
+// ==========================================
+// 表单样式
+// ==========================================
 .login-form {
+  .el-form-item {
+    margin-bottom: 24px;
+  }
+  
+  .custom-input {
+    :deep(.el-input__wrapper) {
+      height: 48px;
+      border-radius: 12px;
+      padding: 0 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      border: 1px solid #e4e7ed;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        border-color: #1890ff;
+        box-shadow: 0 2px 12px rgba(24, 144, 255, 0.1);
+      }
+      
+      &.is-focus {
+        border-color: #1890ff;
+        box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+      }
+      
+      .el-input__prefix {
+        color: #909399;
+      }
+    }
+    
+    :deep(.el-input__inner) {
+      height: 100%;
+      font-size: 15px;
+      
+      &::placeholder {
+        color: #c0c4cc;
+      }
+    }
+  }
+  
   .login-button {
     width: 100%;
-    margin-top: 10px;
+    height: 48px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+    border: none;
+    box-shadow: 0 8px 20px rgba(24, 144, 255, 0.3);
+    transition: all 0.3s ease;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(24, 144, 255, 0.4);
+      background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+    }
+    
+    &:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 16px rgba(24, 144, 255, 0.3);
+    }
   }
 }
 
-.login-footer {
-  text-align: center;
-  margin-top: 20px;
+// ==========================================
+// 卡片底部
+// ==========================================
+.card-footer {
+  margin-top: 24px;
+  
+  .divider {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    
+    &::before,
+    &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #e4e7ed, transparent);
+    }
+    
+    span {
+      padding: 0 16px;
+      color: #909399;
+      font-size: 12px;
+    }
+  }
+  
+  .test-accounts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .account-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      background: #e8f4ff;
+      transform: translateX(4px);
+    }
+    
+    .account-text {
+      font-size: 13px;
+      color: #606266;
+      font-family: 'Monaco', 'Consolas', monospace;
+    }
+  }
+}
+
+// ==========================================
+// 版权信息
+// ==========================================
+.copyright {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
   
   p {
-    color: #999;
+    color: rgba(255, 255, 255, 0.6);
     font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+}
+
+// ==========================================
+// 响应式
+// ==========================================
+@media (max-width: 480px) {
+  .login-card {
+    width: calc(100% - 32px);
+    margin: 16px;
+    padding: 32px 24px;
+  }
+  
+  .card-header {
+    h1 {
+      font-size: 22px;
+    }
   }
 }
 </style>
-

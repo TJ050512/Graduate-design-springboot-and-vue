@@ -40,9 +40,19 @@ public class UserController {
     @Operation(summary = "获取当前用户信息")
     @GetMapping("/info")
     public Result<User> getUserInfo(@RequestHeader("Authorization") String token) {
-        // 从token中解析用户名，然后查询用户信息
-        // 这里简化处理，实际应该在拦截器中处理
-        return Result.success();
+        // 去除Bearer前缀
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        // 从token中解析用户名
+        String username = com.waterworks.utils.JwtUtil.getUsernameFromToken(token);
+        // 根据用户名查询用户信息
+        User user = userService.getUserByUsername(username);
+        if (user != null) {
+            // 清除密码敏感信息
+            user.setPassword(null);
+        }
+        return Result.success(user);
     }
 
     @Operation(summary = "分页查询用户列表")

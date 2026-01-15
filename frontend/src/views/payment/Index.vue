@@ -1,13 +1,19 @@
 <template>
-  <div class="payment-management">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>缴费管理</span>
-          <el-button type="primary" @click="handleCreate">创建缴费单</el-button>
-        </div>
-      </template>
-      
+  <div class="page-container">
+    <!-- 页面头部 -->
+    <div class="page-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+      <div class="header-info">
+        <h2>缴费管理</h2>
+        <p>管理用户的缴费记录，处理水费支付业务</p>
+      </div>
+      <el-button type="primary" @click="handleCreate">
+        <el-icon><Plus /></el-icon>
+        创建缴费单
+      </el-button>
+    </div>
+    
+    <!-- 搜索区域 -->
+    <el-card class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="用户">
           <el-select
@@ -15,7 +21,7 @@
             placeholder="请选择用户"
             clearable
             filterable
-            style="width: 200px"
+            style="width: 180px"
           >
             <el-option
               v-for="user in userList"
@@ -30,11 +36,12 @@
             v-model="searchForm.paymentNo"
             placeholder="请输入缴费单号"
             clearable
-            style="width: 200px"
+            :prefix-icon="Search"
+            style="width: 180px"
           />
         </el-form-item>
         <el-form-item label="支付方式">
-          <el-select v-model="searchForm.paymentMethod" placeholder="请选择" clearable>
+          <el-select v-model="searchForm.paymentMethod" placeholder="全部方式" clearable style="width: 120px">
             <el-option label="现金" :value="1" />
             <el-option label="微信" :value="2" />
             <el-option label="支付宝" :value="3" />
@@ -42,93 +49,124 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable>
+          <el-select v-model="searchForm.status" placeholder="全部状态" clearable style="width: 120px">
             <el-option label="待支付" :value="0" />
             <el-option label="已支付" :value="1" />
             <el-option label="已退款" :value="2" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">
+            <el-icon><Search /></el-icon>
+            查询
+          </el-button>
+          <el-button @click="handleReset">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </el-button>
         </el-form-item>
       </el-form>
-      
-      <el-table :data="tableData" v-loading="loading" border>
-        <el-table-column prop="paymentId" label="ID" width="80" />
-        <el-table-column prop="paymentNo" label="缴费单号" width="180" />
-        <el-table-column label="用户信息" width="150">
+    </el-card>
+    
+    <!-- 数据表格 -->
+    <el-card class="table-card">
+      <el-table 
+        :data="tableData" 
+        v-loading="loading"
+        stripe
+        highlight-current-row
+      >
+        <el-table-column prop="paymentId" label="ID" width="70" align="center" />
+        <el-table-column prop="paymentNo" label="缴费单号" width="180">
           <template #default="{ row }">
-            <div v-if="getUserInfo(row.userId)">
-              {{ getUserInfo(row.userId).realName }}
+            <span class="payment-no">{{ row.paymentNo }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="用户信息" width="130">
+          <template #default="{ row }">
+            <div class="user-info" v-if="getUserInfo(row.userId)">
+              <div class="user-avatar">
+                <el-icon><User /></el-icon>
+              </div>
+              <span>{{ getUserInfo(row.userId).realName }}</span>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="用水记录" width="120">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.usageId"
-              type="text"
-              size="small"
-              @click="viewUsageDetail(row.usageId)"
-            >
-              查看详情
-            </el-button>
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="amount" label="缴费金额(元)" width="120">
+        <el-table-column prop="amount" label="缴费金额" width="120" align="right">
           <template #default="{ row }">
-            <span style="color: #f56c6c; font-weight: bold;">¥{{ row.amount }}</span>
+            <span class="amount-value">¥{{ row.amount.toFixed(2) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="paymentMethod" label="支付方式" width="100">
+        <el-table-column prop="paymentMethod" label="支付方式" width="100" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.paymentMethod === 1" type="info">现金</el-tag>
-            <el-tag v-else-if="row.paymentMethod === 2" type="success">微信</el-tag>
-            <el-tag v-else-if="row.paymentMethod === 3" type="primary">支付宝</el-tag>
-            <el-tag v-else-if="row.paymentMethod === 4" type="warning">银行卡</el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="paymentTime" label="缴费时间" width="180">
-          <template #default="{ row }">
-            {{ row.paymentTime || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="transactionNo" label="交易流水号" width="180" />
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag v-if="row.status === 0" type="warning">待支付</el-tag>
-            <el-tag v-else-if="row.status === 1" type="success">已支付</el-tag>
-            <el-tag v-else type="danger">已退款</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.status === 0"
-              type="success"
-              size="small"
-              @click="handlePay(row)"
+            <el-tag 
+              :type="getPaymentMethodType(row.paymentMethod)" 
+              effect="light"
+              class="method-tag"
             >
-              支付
-            </el-button>
-            <el-button type="primary" size="small" @click="handleView(row)">详情</el-button>
+              <el-icon class="tag-icon"><component :is="getPaymentMethodIcon(row.paymentMethod)" /></el-icon>
+              {{ getPaymentMethodName(row.paymentMethod) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="paymentTime" label="缴费时间" width="170" align="center">
+          <template #default="{ row }">
+            <span v-if="row.paymentTime">{{ row.paymentTime }}</span>
+            <span v-else class="text-secondary">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="transactionNo" label="交易流水号" width="180">
+          <template #default="{ row }">
+            <span class="transaction-no">{{ row.transactionNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getStatusType(row.status)"
+              effect="light"
+              class="status-tag"
+            >
+              <span class="status-dot" :class="getStatusClass(row.status)"></span>
+              {{ getStatusName(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" align="center" fixed="right">
+          <template #default="{ row }">
+            <div class="action-buttons">
+              <el-button
+                v-if="row.status === 0"
+                type="success"
+                link
+                @click="handlePay(row)"
+              >
+                <el-icon><CreditCard /></el-icon>
+                支付
+              </el-button>
+              <el-button type="primary" link @click="handleView(row)">
+                <el-icon><View /></el-icon>
+                详情
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
       
-      <el-pagination
-        v-model:current-page="pagination.current"
-        v-model:page-size="pagination.size"
-        :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-        style="margin-top: 20px; justify-content: flex-end;"
-      />
+      <!-- 分页 -->
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          background
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
     
     <!-- 创建缴费单对话框 -->
@@ -136,6 +174,7 @@
       v-model="createDialogVisible"
       title="创建缴费单"
       width="600px"
+      destroy-on-close
       @close="handleCreateDialogClose"
     >
       <el-form
@@ -143,6 +182,7 @@
         :model="createFormData"
         :rules="createFormRules"
         label-width="120px"
+        class="dialog-form"
       >
         <el-form-item label="用水记录" prop="usageId">
           <el-select
@@ -155,7 +195,7 @@
             <el-option
               v-for="usage in usageList"
               :key="usage.usageId"
-              :label="`${usage.readMonth} - 用户:${getUserInfo(usage.userId)?.realName || ''} - 金额:¥${usage.amount}`"
+              :label="`${usage.readMonth} - ${getUserInfo(usage.userId)?.realName || ''} - ¥${usage.amount}`"
               :value="usage.usageId"
             />
           </el-select>
@@ -164,62 +204,76 @@
           <el-input
             :value="getUserInfo(createFormData.userId)?.realName || ''"
             disabled
+            placeholder="选择用水记录后自动填充"
           />
         </el-form-item>
-        <el-form-item label="水表">
+        <el-form-item label="缴费金额">
           <el-input
-            :value="getMeterInfo(createFormData.meterId)?.meterNo || ''"
+            :value="`¥ ${createFormData.amount.toFixed(2)}`"
             disabled
-          />
-        </el-form-item>
-        <el-form-item label="缴费金额(元)">
-          <el-input-number
-            v-model="createFormData.amount"
-            :precision="2"
-            :min="0"
-            :disabled="true"
-            style="width: 100%"
+            class="amount-display"
           />
         </el-form-item>
         <el-form-item label="支付方式" prop="paymentMethod">
-          <el-radio-group v-model="createFormData.paymentMethod">
-            <el-radio :label="1">现金</el-radio>
-            <el-radio :label="2">微信</el-radio>
-            <el-radio :label="3">支付宝</el-radio>
-            <el-radio :label="4">银行卡</el-radio>
+          <el-radio-group v-model="createFormData.paymentMethod" class="payment-method-group">
+            <el-radio-button :value="1">
+              <el-icon><Coin /></el-icon>
+              现金
+            </el-radio-button>
+            <el-radio-button :value="2">
+              <el-icon><ChatDotRound /></el-icon>
+              微信
+            </el-radio-button>
+            <el-radio-button :value="3">
+              <el-icon><Wallet /></el-icon>
+              支付宝
+            </el-radio-button>
+            <el-radio-button :value="4">
+              <el-icon><CreditCard /></el-icon>
+              银行卡
+            </el-radio-button>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleCreateSubmit">确定</el-button>
+        <div class="dialog-footer">
+          <el-button @click="createDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleCreateSubmit" :loading="submitLoading">确定</el-button>
+        </div>
       </template>
     </el-dialog>
     
-    <!-- 支付对话框 -->
+    <!-- 支付确认对话框 -->
     <el-dialog
       v-model="payDialogVisible"
       title="确认支付"
       width="500px"
     >
-      <el-descriptions :column="1" border>
-        <el-descriptions-item label="缴费单号">{{ currentPayment.paymentNo }}</el-descriptions-item>
-        <el-descriptions-item label="缴费金额">
-          <span style="color: #f56c6c; font-size: 18px; font-weight: bold;">¥{{ currentPayment.amount }}</span>
-        </el-descriptions-item>
-        <el-descriptions-item label="支付方式">
-          <el-tag v-if="currentPayment.paymentMethod === 1" type="info">现金</el-tag>
-          <el-tag v-else-if="currentPayment.paymentMethod === 2" type="success">微信</el-tag>
-          <el-tag v-else-if="currentPayment.paymentMethod === 3" type="primary">支付宝</el-tag>
-          <el-tag v-else-if="currentPayment.paymentMethod === 4" type="warning">银行卡</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="用户">
-          {{ getUserInfo(currentPayment.userId)?.realName || '' }}
-        </el-descriptions-item>
-      </el-descriptions>
+      <div class="pay-confirm-card">
+        <div class="pay-amount">
+          <span class="label">支付金额</span>
+          <span class="value">¥{{ currentPayment.amount?.toFixed(2) }}</span>
+        </div>
+        <el-descriptions :column="1" border size="small">
+          <el-descriptions-item label="缴费单号">{{ currentPayment.paymentNo }}</el-descriptions-item>
+          <el-descriptions-item label="用户">
+            {{ getUserInfo(currentPayment.userId)?.realName || '' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="支付方式">
+            <el-tag :type="getPaymentMethodType(currentPayment.paymentMethod)" effect="light">
+              {{ getPaymentMethodName(currentPayment.paymentMethod) }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
       <template #footer>
-        <el-button @click="payDialogVisible = false">取消</el-button>
-        <el-button type="success" @click="handlePayConfirm">确认支付</el-button>
+        <div class="dialog-footer">
+          <el-button @click="payDialogVisible = false">取消</el-button>
+          <el-button type="success" @click="handlePayConfirm" :loading="payLoading">
+            <el-icon><CreditCard /></el-icon>
+            确认支付
+          </el-button>
+        </div>
       </template>
     </el-dialog>
     
@@ -230,26 +284,24 @@
       width="600px"
     >
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="缴费单号">{{ currentPayment.paymentNo }}</el-descriptions-item>
+        <el-descriptions-item label="缴费单号" :span="2">
+          <span class="payment-no">{{ currentPayment.paymentNo }}</span>
+        </el-descriptions-item>
         <el-descriptions-item label="缴费金额">
-          <span style="color: #f56c6c; font-weight: bold;">¥{{ currentPayment.amount }}</span>
+          <span class="amount-value">¥{{ currentPayment.amount?.toFixed(2) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="支付方式">
+          <el-tag :type="getPaymentMethodType(currentPayment.paymentMethod)" effect="light">
+            {{ getPaymentMethodName(currentPayment.paymentMethod) }}
+          </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="用户">
           {{ getUserInfo(currentPayment.userId)?.realName || '' }}
         </el-descriptions-item>
-        <el-descriptions-item label="水表">
-          {{ getMeterInfo(currentPayment.meterId)?.meterNo || '' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="支付方式">
-          <el-tag v-if="currentPayment.paymentMethod === 1" type="info">现金</el-tag>
-          <el-tag v-else-if="currentPayment.paymentMethod === 2" type="success">微信</el-tag>
-          <el-tag v-else-if="currentPayment.paymentMethod === 3" type="primary">支付宝</el-tag>
-          <el-tag v-else-if="currentPayment.paymentMethod === 4" type="warning">银行卡</el-tag>
-        </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag v-if="currentPayment.status === 0" type="warning">待支付</el-tag>
-          <el-tag v-else-if="currentPayment.status === 1" type="success">已支付</el-tag>
-          <el-tag v-else type="danger">已退款</el-tag>
+          <el-tag :type="getStatusType(currentPayment.status)" effect="light">
+            {{ getStatusName(currentPayment.status) }}
+          </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="缴费时间">
           {{ currentPayment.paymentTime || '-' }}
@@ -266,14 +318,27 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, markRaw } from 'vue'
 import { getPaymentPage, createPayment, pay, getPaymentById } from '@/api/payment'
 import { getUsagePage } from '@/api/waterUsage'
 import { getUserPage } from '@/api/user'
 import { getMeterPage } from '@/api/waterMeter'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  Plus,
+  Search,
+  Refresh,
+  User,
+  View,
+  CreditCard,
+  Coin,
+  ChatDotRound,
+  Wallet
+} from '@element-plus/icons-vue'
 
 const loading = ref(false)
+const submitLoading = ref(false)
+const payLoading = ref(false)
 const tableData = ref([])
 const createDialogVisible = ref(false)
 const payDialogVisible = ref(false)
@@ -321,17 +386,49 @@ const createFormRules = {
   paymentMethod: [{ required: true, message: '请选择支付方式', trigger: 'change' }]
 }
 
-// 获取用户信息
+const getStatusName = (status) => {
+  const names = { 0: '待支付', 1: '已支付', 2: '已退款' }
+  return names[status] || '未知'
+}
+
+const getStatusType = (status) => {
+  const types = { 0: 'warning', 1: 'success', 2: 'danger' }
+  return types[status] || 'info'
+}
+
+const getStatusClass = (status) => {
+  const classes = { 0: 'warning', 1: 'success', 2: 'danger' }
+  return classes[status] || ''
+}
+
+const getPaymentMethodName = (method) => {
+  const names = { 1: '现金', 2: '微信', 3: '支付宝', 4: '银行卡' }
+  return names[method] || '未知'
+}
+
+const getPaymentMethodType = (method) => {
+  const types = { 1: 'info', 2: 'success', 3: 'primary', 4: 'warning' }
+  return types[method] || 'info'
+}
+
+const getPaymentMethodIcon = (method) => {
+  const icons = { 
+    1: markRaw(Coin), 
+    2: markRaw(ChatDotRound), 
+    3: markRaw(Wallet), 
+    4: markRaw(CreditCard) 
+  }
+  return icons[method] || markRaw(CreditCard)
+}
+
 const getUserInfo = (userId) => {
   return userList.value.find(u => u.userId === userId)
 }
 
-// 获取水表信息
 const getMeterInfo = (meterId) => {
   return meterList.value.find(m => m.meterId === meterId)
 }
 
-// 加载用户列表
 const loadUserList = async () => {
   try {
     const res = await getUserPage({ page: 1, size: 1000 })
@@ -343,7 +440,6 @@ const loadUserList = async () => {
   }
 }
 
-// 加载水表列表
 const loadMeterList = async () => {
   try {
     const res = await getMeterPage({ page: 1, size: 1000 })
@@ -355,22 +451,17 @@ const loadMeterList = async () => {
   }
 }
 
-// 加载可用用水记录（已确认但未缴费的）
 const loadUsageList = async () => {
   try {
     const res = await getUsagePage({ page: 1, size: 1000, status: 1 })
     if (res.code === 200) {
-      usageList.value = res.data.records.filter(usage => {
-        // 只显示已确认但未缴费的记录（status=1）
-        return usage.status === 1
-      })
+      usageList.value = res.data.records.filter(usage => usage.status === 1)
     }
   } catch (error) {
     console.error('加载用水记录列表失败', error)
   }
 }
 
-// 用水记录改变时，自动填充相关信息
 const handleUsageChange = (usageId) => {
   const usage = usageList.value.find(u => u.usageId === usageId)
   if (usage) {
@@ -428,6 +519,7 @@ const handleCreateSubmit = async () => {
   if (!createFormRef.value) return
   await createFormRef.value.validate(async (valid) => {
     if (valid) {
+      submitLoading.value = true
       try {
         const res = await createPayment(createFormData)
         if (res.code === 200) {
@@ -437,6 +529,8 @@ const handleCreateSubmit = async () => {
         }
       } catch (error) {
         console.error(error)
+      } finally {
+        submitLoading.value = false
       }
     }
   })
@@ -452,6 +546,7 @@ const handlePay = (row) => {
 }
 
 const handlePayConfirm = async () => {
+  payLoading.value = true
   try {
     const res = await pay(currentPayment.paymentId)
     if (res.code === 200) {
@@ -461,6 +556,8 @@ const handlePayConfirm = async () => {
     }
   } catch (error) {
     console.error(error)
+  } finally {
+    payLoading.value = false
   }
 }
 
@@ -474,10 +571,6 @@ const handleView = async (row) => {
   } catch (error) {
     console.error(error)
   }
-}
-
-const viewUsageDetail = (usageId) => {
-  ElMessage.info('用水记录详情功能待实现')
 }
 
 const handleSizeChange = () => {
@@ -496,15 +589,235 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.payment-management {
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.page-container {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// 页面头部
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 24px;
+  border-radius: 12px;
+  color: white;
+  
+  .header-info {
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    
+    p {
+      font-size: 14px;
+      opacity: 0.85;
+    }
+  }
+  
+  .el-button {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+  }
+}
+
+// 搜索卡片
+.search-card {
+  margin-bottom: 20px;
+  
+  :deep(.el-card__body) {
+    padding: 20px;
   }
   
   .search-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    
+    .el-form-item {
+      margin-bottom: 0;
+      margin-right: 0;
+    }
+  }
+}
+
+// 表格卡片
+.table-card {
+  :deep(.el-card__body) {
+    padding: 0;
+  }
+}
+
+.payment-no {
+  font-family: 'Monaco', 'Consolas', monospace;
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.transaction-no {
+  font-family: 'Monaco', 'Consolas', monospace;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  .user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+  }
+}
+
+.amount-value {
+  font-weight: 700;
+  color: #f56c6c;
+  font-size: 15px;
+}
+
+.method-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  
+  .tag-icon {
+    font-size: 12px;
+  }
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    
+    &.warning {
+      background-color: #e6a23c;
+      box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.2);
+    }
+    
+    &.success {
+      background-color: #52c41a;
+      box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2);
+    }
+    
+    &.danger {
+      background-color: #ff4d4f;
+      box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.2);
+    }
+  }
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+// 分页
+.pagination-container {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color-light);
+}
+
+// 对话框表单
+.dialog-form {
+  padding: 10px 20px;
+  
+  .payment-method-group {
+    :deep(.el-radio-button__inner) {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  }
+}
+
+.amount-display {
+  :deep(.el-input__inner) {
+    color: #f56c6c;
+    font-weight: 600;
+    font-size: 16px;
+  }
+}
+
+// 支付确认卡片
+.pay-confirm-card {
+  .pay-amount {
+    text-align: center;
+    padding: 24px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+    border-radius: 12px;
     margin-bottom: 20px;
+    
+    .label {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    
+    .value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #f56c6c;
+    }
+  }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+// 响应式
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .search-form {
+    flex-direction: column;
   }
 }
 </style>
