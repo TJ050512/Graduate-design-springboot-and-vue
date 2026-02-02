@@ -1,295 +1,298 @@
-# 水务管理系统 - 后端
+# 水务管理系统
 
-## 项目简介
+基于 **Spring Boot 3 + Vue 3** 的水务管理系统，实现用户管理、水表管理、用水记录、缴费管理、报修工单等功能，支持阶梯水价计算和数据可视化。
 
-基于Spring Boot框架的水务管理系统后端服务，提供用户管理、水表管理、用水记录、缴费管理等功能。
+## 项目预览
+
+- 管理员：用户管理、水表管理、用水记录、缴费管理、公告管理、报修工单、数据统计
+- 普通用户：我的用水、我的缴费、我的报修、系统公告
+- 抄表员：水表管理、用水记录、报修工单、系统公告
 
 ## 技术栈
 
-- **核心框架**: Spring Boot 2.7.14
-- **持久层**: MyBatis Plus 3.5.3.1
-- **数据库**: MySQL 8.0
-- **数据源**: Druid 1.2.18
-- **缓存**: Redis
-- **API文档**: Knife4j 3.0.3 (Swagger增强)
-- **认证**: JWT (JSON Web Token)
-- **工具类**: Hutool、Apache Commons
-- **其他**: Lombok、FastJson
+### 后端
+
+| 技术 | 版本 | 说明 |
+|-----|------|------|
+| Spring Boot | 3.x | 核心框架 |
+| MyBatis-Plus | 3.5.x | ORM 框架 |
+| MySQL | 8.0 | 数据库 |
+| JWT | - | 身份认证 |
+| Swagger/OpenAPI | 3.0 | API 文档 |
+| Lombok | - | 简化代码 |
+| Hutool | - | 工具类库 |
+
+### 前端
+
+| 技术 | 版本 | 说明 |
+|-----|------|------|
+| Vue | 3.x | 前端框架 |
+| Element Plus | 2.x | UI 组件库 |
+| Pinia | 2.x | 状态管理 |
+| Vue Router | 4.x | 路由管理 |
+| Axios | - | HTTP 请求 |
+| ECharts | 5.x | 数据可视化 |
+| Sass | - | CSS 预处理器 |
+
+## 功能模块
+
+### 1. 用户管理
+- 用户登录/注销
+- 用户 CRUD（管理员）
+- 密码修改/重置
+- **密码加盐安全存储**
+- 三种用户角色：管理员、普通用户、抄表员
+
+### 2. 水表管理
+- 水表信息 CRUD
+- 支持多种水表类型：家用表、商用表、工业表
+- 水表状态管理：正常、停用、故障
+
+### 3. 用水记录管理
+- 抄表记录 CRUD
+- **阶梯水价自动计算**
+  - 居民用水：三档阶梯计价（0-15m³、15-25m³、25m³以上）
+  - 商业/工业用水：固定单价
+- 记录状态跟踪：待确认、已确认、已缴费
+
+### 4. 缴费管理
+- 缴费记录创建
+- 在线支付模拟
+- 支持多种支付方式：现金、微信、支付宝、银行卡
+
+### 5. 公告管理
+- 公告 CRUD
+- 公告类型：系统公告、停水通知、价格调整
+- 支持置顶和发布状态控制
+
+### 6. 报修工单（新增）
+- 用户提交报修
+- 工单流转：待处理 → 处理中 → 已完成/已取消
+- 报修类型：水表故障、漏水、水质问题、水压异常、其他
+- 优先级：紧急、普通、低
+- 用户评价（1-5星）
+
+### 7. 数据统计与可视化
+- Dashboard 概览统计
+- **ECharts 图表**：
+  - 用水量趋势图（柱状图+折线图）
+  - 水表类型分布（环形饼图）
+  - 用户类型分布（环形饼图）
+  - 缴费状态统计（环形饼图）
+
+### 8. 权限控制
+- **基于 JWT 的身份认证**
+- **AOP 注解式权限控制**（@RequireRole）
+- 前端路由守卫
 
 ## 项目结构
 
 ```
-water-management-system
-├── src/main/java/com/waterworks
-│   ├── common                 # 通用类
-│   │   ├── Result.java        # 统一返回结果
-│   │   ├── ResultCode.java    # 响应码枚举
-│   │   └── PageResult.java    # 分页结果
-│   ├── config                 # 配置类
-│   │   ├── CorsConfig.java    # 跨域配置
-│   │   ├── Knife4jConfig.java # API文档配置
-│   │   ├── MyBatisPlusConfig.java  # MyBatis Plus配置
-│   │   ├── RedisConfig.java   # Redis配置
-│   │   └── WebMvcConfig.java  # Web MVC配置
-│   ├── controller             # 控制器层
-│   │   ├── UserController.java         # 用户控制器
-│   │   ├── WaterMeterController.java   # 水表控制器
-│   │   ├── WaterUsageController.java   # 用水记录控制器
-│   │   ├── PaymentController.java      # 缴费控制器
-│   │   └── NoticeController.java       # 公告控制器
-│   ├── entity                 # 实体类
-│   │   ├── BaseEntity.java    # 基础实体
-│   │   ├── User.java          # 用户实体
-│   │   ├── WaterMeter.java    # 水表实体
-│   │   ├── WaterUsage.java    # 用水记录实体
-│   │   ├── Payment.java       # 缴费记录实体
-│   │   ├── WaterPrice.java    # 水费价格实体
-│   │   └── Notice.java        # 公告实体
-│   ├── exception              # 异常处理
-│   │   ├── BusinessException.java         # 业务异常
-│   │   └── GlobalExceptionHandler.java    # 全局异常处理器
-│   ├── interceptor            # 拦截器
-│   │   └── JwtInterceptor.java  # JWT拦截器
-│   ├── mapper                 # Mapper层
-│   │   ├── UserMapper.java
-│   │   ├── WaterMeterMapper.java
-│   │   ├── WaterUsageMapper.java
-│   │   ├── PaymentMapper.java
-│   │   ├── WaterPriceMapper.java
-│   │   └── NoticeMapper.java
-│   ├── service                # 服务层
-│   │   ├── impl               # 服务实现
-│   │   ├── UserService.java
-│   │   ├── WaterMeterService.java
-│   │   ├── WaterUsageService.java
-│   │   ├── PaymentService.java
-│   │   └── NoticeService.java
-│   ├── utils                  # 工具类
-│   │   └── JwtUtil.java       # JWT工具类
-│   └── WaterManagementApplication.java  # 启动类
-├── src/main/resources
-│   ├── application.yml        # 主配置文件
-│   ├── application-dev.yml    # 开发环境配置
-│   └── application-prod.yml   # 生产环境配置
-└── pom.xml                    # Maven配置文件
+graduate-design-springboot-and-vue/
+├── src/main/java/com/waterworks/    # 后端源码
+│   ├── annotation/                   # 自定义注解
+│   │   └── RequireRole.java          # 权限注解
+│   ├── aspect/                       # AOP 切面
+│   │   └── RolePermissionAspect.java # 权限切面
+│   ├── common/                       # 通用类
+│   ├── config/                       # 配置类
+│   ├── controller/                   # 控制器
+│   │   ├── UserController.java
+│   │   ├── WaterMeterController.java
+│   │   ├── WaterUsageController.java
+│   │   ├── PaymentController.java
+│   │   ├── NoticeController.java
+│   │   ├── RepairOrderController.java  # 报修工单
+│   │   └── StatisticsController.java   # 统计接口
+│   ├── entity/                       # 实体类
+│   │   ├── User.java
+│   │   ├── WaterMeter.java
+│   │   ├── WaterUsage.java
+│   │   ├── Payment.java
+│   │   ├── WaterPrice.java
+│   │   ├── Notice.java
+│   │   └── RepairOrder.java          # 报修工单实体
+│   ├── exception/                    # 异常处理
+│   ├── interceptor/                  # 拦截器
+│   ├── mapper/                       # Mapper 接口
+│   ├── service/                      # 服务层
+│   │   └── impl/
+│   │       ├── WaterPriceServiceImpl.java  # 阶梯水价计算
+│   │       └── ...
+│   └── utils/                        # 工具类
+├── frontend/                         # 前端源码
+│   ├── src/
+│   │   ├── api/                      # API 接口
+│   │   ├── layout/                   # 布局组件
+│   │   ├── router/                   # 路由配置
+│   │   ├── stores/                   # Pinia 状态管理
+│   │   ├── views/                    # 页面组件
+│   │   │   ├── Dashboard.vue         # 首页（含 ECharts）
+│   │   │   ├── user/                 # 用户管理
+│   │   │   ├── waterMeter/           # 水表管理
+│   │   │   ├── waterUsage/           # 用水记录
+│   │   │   ├── payment/              # 缴费管理
+│   │   │   ├── notice/               # 公告管理
+│   │   │   ├── repair/               # 报修工单（管理员）
+│   │   │   ├── myRepair/             # 我的报修（用户）
+│   │   │   └── ...
+│   │   └── main.js
+│   └── package.json
+├── sql/
+│   ├── init.sql                      # 数据库初始化脚本
+│   └── upgrade_v2.sql                # 升级脚本
+└── pom.xml
 ```
-
-## 核心功能
-
-### 1. 用户管理
-- 用户登录/注销
-- 用户信息管理
-- 密码修改/重置
-- 用户类型：管理员、普通用户、抄表员
-
-### 2. 水表管理
-- 水表信息录入
-- 水表信息查询
-- 水表状态管理
-- 支持多种水表类型：家用表、商用表、工业表
-
-### 3. 用水记录管理
-- 抄表记录录入
-- 用水量统计
-- 水费计算
-- 记录状态跟踪
-
-### 4. 缴费管理
-- 缴费记录创建
-- 在线支付
-- 缴费历史查询
-- 支持多种支付方式
-
-### 5. 公告管理
-- 公告发布
-- 公告查询
-- 公告类型：系统公告、停水通知、价格调整
 
 ## 环境要求
 
-- JDK 1.8+
-- Maven 3.6+
-- MySQL 8.0+
-- Redis 5.0+
+- **JDK 17+**
+- **Maven 3.6+**
+- **MySQL 8.0+**
+- **Node.js 16+**
+- **npm 8+**
 
 ## 快速开始
 
 ### 1. 克隆项目
 
 ```bash
-git clone [项目地址]
+git clone https://github.com/your-repo/graduate-design-springboot-and-vue.git
 cd graduate-design-springboot-and-vue
 ```
 
-### 2. 创建数据库
+### 2. 数据库配置
 
-创建数据库 `water_management`，并执行 `sql/init.sql` 初始化脚本。
+```bash
+# 登录 MySQL
+mysql -u root -p
 
-```sql
-CREATE DATABASE water_management DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+# 执行初始化脚本
+source sql/init.sql
 ```
 
-### 3. 修改配置
+### 3. 修改后端配置
 
-编辑 `src/main/resources/application.yml`，修改数据库连接信息：
+编辑 `src/main/resources/application.yml`：
 
 ```yaml
 spring:
   datasource:
     druid:
-      url: jdbc:mysql://localhost:3306/water_management?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      url: jdbc:mysql://localhost:3306/water_management
       username: root
       password: your_password
 ```
 
-修改Redis配置：
-
-```yaml
-spring:
-  redis:
-    host: localhost
-    port: 6379
-    password: your_password
-```
-
-### 4. 编译运行
+### 4. 启动后端
 
 ```bash
-# 编译项目
-mvn clean install
-
-# 运行项目
+# 方式一：Maven
 mvn spring-boot:run
+
+# 方式二：IDE 运行 WaterManagementApplication.java
 ```
 
-或者使用IDE直接运行 `WaterManagementApplication.java`
+### 5. 启动前端
 
-### 5. 访问接口文档
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-启动成功后，访问：http://localhost:8080/api/doc.html
+### 6. 访问系统
 
-## API接口
+- 前端地址：http://localhost:5173
+- 后端接口：http://localhost:8080/api
+- API 文档：http://localhost:8080/api/doc.html
 
-所有接口统一前缀：`/api`
+## 测试账号
+
+| 角色 | 用户名 | 密码 | 说明 |
+|-----|--------|------|------|
+| 管理员 | admin | admin123 | 系统管理员 |
+| 普通用户 | user001 | 123456 | 测试用户 |
+| 抄表员 | reader001 | 123456 | 测试抄表员 |
+
+## API 接口列表
 
 ### 用户相关
-- `POST /api/user/login` - 用户登录
-- `GET /api/user/info` - 获取用户信息
-- `GET /api/user/page` - 分页查询用户
-- `POST /api/user` - 添加用户
-- `PUT /api/user` - 更新用户
-- `DELETE /api/user/{id}` - 删除用户
+| 方法 | 接口 | 说明 | 权限 |
+|-----|------|------|------|
+| POST | /api/user/login | 用户登录 | 公开 |
+| GET | /api/user/info | 获取当前用户信息 | 登录用户 |
+| GET | /api/user/page | 分页查询用户 | 管理员/抄表员 |
+| POST | /api/user | 添加用户 | 管理员 |
+| PUT | /api/user | 更新用户 | 管理员 |
+| DELETE | /api/user/{id} | 删除用户 | 管理员 |
 
 ### 水表相关
-- `GET /api/waterMeter/page` - 分页查询水表
-- `GET /api/waterMeter/{id}` - 根据ID查询水表
-- `POST /api/waterMeter` - 添加水表
-- `PUT /api/waterMeter` - 更新水表
-- `DELETE /api/waterMeter/{id}` - 删除水表
+| 方法 | 接口 | 说明 | 权限 |
+|-----|------|------|------|
+| GET | /api/waterMeter/page | 分页查询水表 | 管理员/抄表员 |
+| POST | /api/waterMeter | 添加水表 | 管理员 |
+| PUT | /api/waterMeter | 更新水表 | 管理员/抄表员 |
+| DELETE | /api/waterMeter/{id} | 删除水表 | 管理员 |
 
 ### 用水记录相关
-- `GET /api/waterUsage/page` - 分页查询用水记录
-- `GET /api/waterUsage/{id}` - 根据ID查询记录
-- `POST /api/waterUsage` - 添加用水记录
-- `PUT /api/waterUsage/confirm/{id}` - 确认用水记录
-- `DELETE /api/waterUsage/{id}` - 删除记录
+| 方法 | 接口 | 说明 | 权限 |
+|-----|------|------|------|
+| GET | /api/waterUsage/page | 分页查询用水记录 | 登录用户 |
+| POST | /api/waterUsage | 添加用水记录 | 管理员/抄表员 |
+| PUT | /api/waterUsage | 更新用水记录 | 管理员/抄表员 |
+| PUT | /api/waterUsage/confirm/{id} | 确认记录 | 管理员 |
+| DELETE | /api/waterUsage/{id} | 删除记录 | 管理员 |
 
 ### 缴费相关
-- `GET /api/payment/page` - 分页查询缴费记录
-- `GET /api/payment/{id}` - 根据ID查询记录
-- `POST /api/payment` - 创建缴费记录
-- `PUT /api/payment/pay/{id}` - 支付
+| 方法 | 接口 | 说明 | 权限 |
+|-----|------|------|------|
+| GET | /api/payment/page | 分页查询缴费记录 | 管理员/用户 |
+| POST | /api/payment | 创建缴费记录 | 管理员 |
+| PUT | /api/payment/pay/{id} | 支付 | 登录用户 |
 
-### 公告相关
-- `GET /api/notice/page` - 分页查询公告
-- `GET /api/notice/{id}` - 根据ID查询公告
-- `POST /api/notice` - 添加公告
-- `PUT /api/notice` - 更新公告
-- `PUT /api/notice/publish/{id}` - 发布公告
-- `DELETE /api/notice/{id}` - 删除公告
+### 报修工单相关
+| 方法 | 接口 | 说明 | 权限 |
+|-----|------|------|------|
+| GET | /api/repair/page | 分页查询工单 | 登录用户 |
+| POST | /api/repair | 创建工单 | 登录用户 |
+| PUT | /api/repair/handle/{id} | 开始处理 | 管理员/抄表员 |
+| PUT | /api/repair/complete/{id} | 完成工单 | 管理员/抄表员 |
+| PUT | /api/repair/cancel/{id} | 取消工单 | 登录用户 |
+| PUT | /api/repair/feedback/{id} | 用户评价 | 登录用户 |
 
-## 配置说明
+### 统计相关
+| 方法 | 接口 | 说明 | 权限 |
+|-----|------|------|------|
+| GET | /api/statistics/overview | 概览统计 | 登录用户 |
+| GET | /api/statistics/usage-trend | 用水趋势 | 管理员 |
+| GET | /api/statistics/user-distribution | 用户分布 | 管理员 |
+| GET | /api/statistics/meter-distribution | 水表分布 | 管理员/抄表员 |
+| GET | /api/statistics/payment-status | 缴费状态 | 管理员 |
 
-### JWT配置
+## 技术亮点
 
-```yaml
-jwt:
-  secret: waterManagementSystemSecretKey2024  # JWT密钥
-  expiration: 24  # 过期时间(小时)
-  token-prefix: Bearer   # token前缀
-  header: Authorization  # token header key
-```
+1. **阶梯水价计算** - 符合实际水务业务场景，支持多档位阶梯定价
+2. **AOP 权限控制** - 基于注解的细粒度权限控制，代码优雅
+3. **ECharts 可视化** - 多种图表展示统计数据，界面美观
+4. **密码加盐存储** - MD5 + Salt 加密，提升安全性
+5. **完整的工单流转** - 报修工单从创建到完成的完整生命周期
 
-### 数据库连接池配置
+## 项目截图
 
-使用Druid连接池，配置详见 `application.yml`
-
-监控页面：http://localhost:8080/api/druid/login.html
-- 用户名：admin
-- 密码：admin
-
-## 开发说明
-
-### 1. 统一返回格式
-
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {},
-  "timestamp": 1234567890
-}
-```
-
-### 2. 分页返回格式
-
-```json
-{
-  "code": 200,
-  "message": "操作成功",
-  "data": {
-    "current": 1,
-    "size": 10,
-    "total": 100,
-    "pages": 10,
-    "records": []
-  },
-  "timestamp": 1234567890
-}
-```
-
-### 3. 异常处理
-
-所有异常都会被全局异常处理器捕获并返回统一格式的错误信息。
-
-### 4. 接口鉴权
-
-除了登录接口，其他接口都需要在Header中携带JWT token：
-
-```
-Authorization: Bearer {token}
-```
+（可在此处添加系统截图）
 
 ## 注意事项
 
-1. 首次启动前需要创建数据库并执行初始化脚本
-2. 修改配置文件中的数据库和Redis连接信息
-3. JWT密钥建议在生产环境中修改为复杂的字符串
-4. 生产环境建议关闭Druid监控或设置复杂的账号密码
-5. 默认管理员账号密码请在系统启动后及时修改
-
-## 待完成功能
-
-- [ ] 数据库初始化SQL脚本
-- [ ] 单元测试
-- [ ] 数据导出功能
-- [ ] 报表统计功能
-- [ ] 短信通知功能
-- [ ] 图片上传功能
-- [ ] 操作日志记录
+1. 首次启动前需要执行 `sql/init.sql` 初始化数据库
+2. 如果是从旧版本升级，需要执行 `sql/upgrade_v2.sql`
+3. 前端开发服务器默认端口 5173，后端默认端口 8080
+4. 生产环境部署建议修改 JWT 密钥和数据库密码
 
 ## 许可证
 
 本项目仅用于学习交流，请勿用于商业用途。
 
+---
 
+**毕业设计** | Spring Boot 3 + Vue 3 | 2024
