@@ -1,6 +1,7 @@
 package com.waterworks.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
 import com.waterworks.common.Result;
 import com.waterworks.entity.User;
@@ -57,6 +58,7 @@ public class UserController {
 
     @Operation(summary = "分页查询用户列表")
     @GetMapping("/page")
+    @RequireRole(roles = {1, 3}, description = "管理员和抄表员可查询用户列表")
     public Result<PageResult<User>> getUserPage(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
@@ -82,6 +84,7 @@ public class UserController {
 
     @Operation(summary = "添加用户")
     @PostMapping
+    @RequireRole(roles = {1}, description = "仅管理员可添加用户")
     public Result<Boolean> addUser(@Valid @RequestBody User user) {
         boolean result = userService.addUser(user);
         return Result.success(result);
@@ -89,6 +92,7 @@ public class UserController {
 
     @Operation(summary = "更新用户")
     @PutMapping
+    @RequireRole(roles = {1}, description = "仅管理员可更新用户")
     public Result<Boolean> updateUser(@Valid @RequestBody User user) {
         boolean result = userService.updateUser(user);
         return Result.success(result);
@@ -96,6 +100,7 @@ public class UserController {
 
     @Operation(summary = "删除用户")
     @DeleteMapping("/{id}")
+    @RequireRole(roles = {1}, description = "仅管理员可删除用户")
     public Result<Boolean> deleteUser(@PathVariable Long id) {
         boolean result = userService.removeById(id);
         return Result.success(result);
@@ -113,6 +118,7 @@ public class UserController {
 
     @Operation(summary = "重置密码")
     @PutMapping("/resetPassword/{id}")
+    @RequireRole(roles = {1}, description = "仅管理员可重置密码")
     public Result<Boolean> resetPassword(@PathVariable Long id) {
         boolean result = userService.resetPassword(id);
         return Result.success(result);

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `sys_user` (
     `user_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户ID',
     `username` VARCHAR(50) NOT NULL COMMENT '用户名',
     `password` VARCHAR(100) NOT NULL COMMENT '密码',
+    `salt` VARCHAR(32) COMMENT '密码盐值',
     `real_name` VARCHAR(50) COMMENT '真实姓名',
     `gender` TINYINT DEFAULT 1 COMMENT '性别(0:女 1:男)',
     `phone` VARCHAR(20) COMMENT '手机号',
@@ -156,6 +157,43 @@ CREATE TABLE IF NOT EXISTS `notice` (
     KEY `idx_is_top` (`is_top`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公告表';
+
+-- 报修工单表
+CREATE TABLE IF NOT EXISTS `repair_order` (
+    `order_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '工单ID',
+    `order_no` VARCHAR(50) NOT NULL COMMENT '工单编号',
+    `user_id` BIGINT NOT NULL COMMENT '报修用户ID',
+    `meter_id` BIGINT COMMENT '关联水表ID',
+    `repair_type` TINYINT NOT NULL DEFAULT 1 COMMENT '报修类型(1:水表故障 2:漏水 3:水质问题 4:水压异常 5:其他)',
+    `title` VARCHAR(100) NOT NULL COMMENT '报修标题',
+    `description` TEXT NOT NULL COMMENT '问题描述',
+    `contact_name` VARCHAR(50) COMMENT '联系人姓名',
+    `contact_phone` VARCHAR(20) COMMENT '联系电话',
+    `address` VARCHAR(255) COMMENT '报修地址',
+    `images` VARCHAR(500) COMMENT '图片路径(多个用逗号分隔)',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态(0:待处理 1:处理中 2:已完成 3:已取消)',
+    `priority` TINYINT NOT NULL DEFAULT 2 COMMENT '优先级(1:紧急 2:普通 3:低)',
+    `handler_id` BIGINT COMMENT '处理人ID',
+    `handle_time` DATETIME COMMENT '开始处理时间',
+    `complete_time` DATETIME COMMENT '完成时间',
+    `handle_result` TEXT COMMENT '处理结果',
+    `feedback` TEXT COMMENT '用户反馈',
+    `rating` TINYINT COMMENT '评分(1-5星)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `create_by` BIGINT COMMENT '创建人',
+    `update_by` BIGINT COMMENT '更新人',
+    `deleted` TINYINT DEFAULT 0 COMMENT '逻辑删除(0:未删除 1:已删除)',
+    `remark` VARCHAR(500) COMMENT '备注',
+    PRIMARY KEY (`order_id`),
+    UNIQUE KEY `uk_order_no` (`order_no`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_meter_id` (`meter_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_repair_type` (`repair_type`),
+    KEY `idx_handler_id` (`handler_id`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报修工单表';
 
 -- 插入默认管理员账号 (密码: admin123 经过MD5加密)
 INSERT INTO `sys_user` (`username`, `password`, `real_name`, `user_type`, `status`, `remark`) 

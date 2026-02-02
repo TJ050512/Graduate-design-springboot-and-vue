@@ -33,6 +33,11 @@ public class User extends BaseEntity {
     private String password;
 
     /**
+     * 密码盐值
+     */
+    private String salt;
+
+    /**
      * 真实姓名
      */
     private String realName;

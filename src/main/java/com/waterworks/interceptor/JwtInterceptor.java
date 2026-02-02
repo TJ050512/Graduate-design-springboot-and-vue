@@ -37,11 +37,16 @@ public class JwtInterceptor implements HandlerInterceptor {
             throw new BusinessException(ResultCode.TOKEN_EXPIRED);
         }
 
-        // 可以将用户信息存入ThreadLocal或request中
+        // 将用户信息存入request中（用于权限校验）
         Long userId = JwtUtil.getUserIdFromToken(token);
         String username = JwtUtil.getUsernameFromToken(token);
+        Integer userType = JwtUtil.getUserTypeFromToken(token);
+        
         request.setAttribute("userId", userId);
         request.setAttribute("username", username);
+        request.setAttribute("userType", userType);
+
+        log.debug("JWT拦截器：用户{}({})通过验证，角色类型：{}", username, userId, userType);
 
         return true;
     }

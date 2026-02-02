@@ -1,6 +1,7 @@
 package com.waterworks.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
 import com.waterworks.common.Result;
 import com.waterworks.entity.WaterUsage;
@@ -51,6 +52,7 @@ public class WaterUsageController {
 
     @Operation(summary = "添加用水记录")
     @PostMapping
+    @RequireRole(roles = {1, 3}, description = "管理员和抄表员可添加用水记录")
     public Result<Boolean> addUsage(@Valid @RequestBody WaterUsage waterUsage) {
         boolean result = waterUsageService.addUsage(waterUsage);
         return Result.success(result);
@@ -58,6 +60,7 @@ public class WaterUsageController {
 
     @Operation(summary = "更新用水记录")
     @PutMapping
+    @RequireRole(roles = {1, 3}, description = "管理员和抄表员可更新用水记录")
     public Result<Boolean> updateUsage(@Valid @RequestBody WaterUsage waterUsage) {
         boolean result = waterUsageService.updateUsage(waterUsage);
         return Result.success(result);
@@ -65,6 +68,7 @@ public class WaterUsageController {
 
     @Operation(summary = "确认用水记录")
     @PutMapping("/confirm/{id}")
+    @RequireRole(roles = {1}, description = "仅管理员可确认用水记录")
     public Result<Boolean> confirmUsage(@PathVariable Long id) {
         boolean result = waterUsageService.confirmUsage(id);
         return Result.success(result);
@@ -72,6 +76,7 @@ public class WaterUsageController {
 
     @Operation(summary = "删除用水记录")
     @DeleteMapping("/{id}")
+    @RequireRole(roles = {1}, description = "仅管理员可删除用水记录")
     public Result<Boolean> deleteUsage(@PathVariable Long id) {
         boolean result = waterUsageService.removeById(id);
         return Result.success(result);

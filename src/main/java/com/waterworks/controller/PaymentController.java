@@ -1,6 +1,7 @@
 package com.waterworks.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
 import com.waterworks.common.Result;
 import com.waterworks.entity.Payment;
@@ -25,6 +26,7 @@ public class PaymentController {
 
     @Operation(summary = "分页查询缴费记录列表")
     @GetMapping("/page")
+    @RequireRole(roles = {1, 2}, description = "管理员和普通用户可查询缴费记录")
     public Result<PageResult<Payment>> getPaymentPage(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
@@ -51,6 +53,7 @@ public class PaymentController {
 
     @Operation(summary = "创建缴费记录")
     @PostMapping
+    @RequireRole(roles = {1}, description = "仅管理员可创建缴费记录")
     public Result<Boolean> createPayment(@Valid @RequestBody Payment payment) {
         boolean result = paymentService.createPayment(payment);
         return Result.success(result);

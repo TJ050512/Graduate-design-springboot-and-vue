@@ -39,9 +39,24 @@ public class JwtUtil {
      * @return token
      */
     public static String generateToken(Long userId, String username) {
+        return generateToken(userId, username, null);
+    }
+
+    /**
+     * 生成token（包含用户类型）
+     *
+     * @param userId   用户ID
+     * @param username 用户名
+     * @param userType 用户类型(1:管理员 2:普通用户 3:抄表员)
+     * @return token
+     */
+    public static String generateToken(Long userId, String username, Integer userType) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
+        if (userType != null) {
+            claims.put("userType", userType);
+        }
         return generateToken(claims);
     }
 
@@ -104,6 +119,20 @@ public class JwtUtil {
         Claims claims = getClaimsFromToken(token);
         if (claims != null) {
             return claims.get("username").toString();
+        }
+        return null;
+    }
+
+    /**
+     * 从token中获取用户类型
+     *
+     * @param token token
+     * @return 用户类型(1:管理员 2:普通用户 3:抄表员)
+     */
+    public static Integer getUserTypeFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        if (claims != null && claims.get("userType") != null) {
+            return Integer.valueOf(claims.get("userType").toString());
         }
         return null;
     }

@@ -1,6 +1,7 @@
 package com.waterworks.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -64,7 +65,9 @@ public class WaterUsage extends BaseEntity {
 
     /**
      * 用水量(立方米)
+     * 注意：usage是MySQL保留字，需要用反引号包裹
      */
+    @TableField("`usage`")
     private BigDecimal usage;
 
     /**

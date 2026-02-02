@@ -1,5 +1,6 @@
 package com.waterworks.service.impl;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -11,13 +12,45 @@ import com.waterworks.exception.BusinessException;
 import com.waterworks.mapper.UserMapper;
 import com.waterworks.service.UserService;
 import com.waterworks.utils.JwtUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
  * 用户服务实现类
  */
+@Slf4j
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    /**
+     * 生成随机盐值
+     */
+    private String generateSalt() {
+        return IdUtil.fastSimpleUUID().substring(0, 16);
+    }
+
+    /**
+     * 使用盐值加密密码
+     * 加密算法：MD5(MD5(password) + salt)
+     */
+    private String encryptPassword(String password, String salt) {
+        return DigestUtil.md5Hex(DigestUtil.md5Hex(password) + salt);
+    }
+
+    /**
+     * 验证密码（兼容旧的无盐密码）
+     */
+    private boolean verifyPassword(String inputPassword, User user) {
+        if (StrUtil.isNotBlank(user.getSalt())) {
+            // 新版加盐密码验证
+            String encryptedInput = encryptPassword(inputPassword, user.getSalt());
+            return encryptedInput.equals(user.getPassword());
+        } else {
+            // 兼容旧版无盐密码（纯MD5）
+            String oldEncrypt = DigestUtil.md5Hex(inputPassword);
+            return oldEncrypt.equals(user.getPassword());
+        }
+    }
 
     @Override
     public String login(String username, String password) {
@@ -27,9 +60,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
         }
 
-        // 验证密码
-        String encryptPassword = DigestUtil.md5Hex(password);
-        if (!encryptPassword.equals(user.getPassword())) {
+        // 验证密码（兼容新旧两种加密方式）
+        if (!verifyPassword(password, user)) {
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR);
         }
 
@@ -38,8 +70,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_ACCOUNT_FORBIDDEN);
         }
 
-        // 生成token
-        return JwtUtil.generateToken(user.getUserId(), user.getUsername());
+        // 如果是旧密码（无盐），自动升级为加盐密码
+        if (StrUtil.isBlank(user.getSalt())) {
+            log.info("用户 {} 密码升级为加盐存储", username);
+            String salt = generateSalt();
+            String newPassword = encryptPassword(password, salt);
+            user.setSalt(salt);
+            user.setPassword(newPassword);
+            this.updateById(user);
+        }
+
+        // 生成token（包含用户类型，用于权限控制）
+        return JwtUtil.generateToken(user.getUserId(), user.getUsername(), user.getUserType());
     }
 
     @Override
@@ -78,8 +120,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_HAS_EXISTED);
         }
 
-        // 密码加密
-        user.setPassword(DigestUtil.md5Hex(user.getPassword()));
+        // 生成盐值并加密密码
+        String salt = generateSalt();
+        user.setSalt(salt);
+        user.setPassword(encryptPassword(user.getPassword(), salt));
         
         return this.save(user);
     }
@@ -109,14 +153,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
         }
 
-        // 验证旧密码
-        String encryptOldPassword = DigestUtil.md5Hex(oldPassword);
-        if (!encryptOldPassword.equals(user.getPassword())) {
+        // 验证旧密码（兼容新旧两种加密方式）
+        if (!verifyPassword(oldPassword, user)) {
             throw new BusinessException(ResultCode.USER_PASSWORD_ERROR);
         }
 
-        // 更新密码
-        user.setPassword(DigestUtil.md5Hex(newPassword));
+        // 生成新盐值并加密新密码
+        String salt = generateSalt();
+        user.setSalt(salt);
+        user.setPassword(encryptPassword(newPassword, salt));
         return this.updateById(user);
     }
 
@@ -127,8 +172,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
         }
 
-        // 重置为默认密码123456
-        user.setPassword(DigestUtil.md5Hex("123456"));
+        // 生成新盐值并重置为默认密码123456
+        String salt = generateSalt();
+        user.setSalt(salt);
+        user.setPassword(encryptPassword("123456", salt));
         return this.updateById(user);
     }
 }

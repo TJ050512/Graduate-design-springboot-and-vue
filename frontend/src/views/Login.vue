@@ -17,8 +17,34 @@
       <div class="card-header">
         <div class="logo">
           <div class="logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" fill="currentColor"/>
+            <svg viewBox="0 0 100 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="dropGradient" x1="50%" y1="0%" x2="50%" y2="100%">
+                  <stop offset="0%" stop-color="#4facfe"/>
+                  <stop offset="100%" stop-color="#00f2fe"/>
+                </linearGradient>
+                <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#4facfe" flood-opacity="0.4"/>
+                </filter>
+              </defs>
+              <!-- 水滴形状 -->
+              <path d="M50 8 C50 8, 85 50, 85 75 C85 95, 70 110, 50 110 C30 110, 15 95, 15 75 C15 50, 50 8, 50 8Z" 
+                    fill="url(#dropGradient)" filter="url(#dropShadow)"/>
+              <!-- 电路线条装饰 -->
+              <g stroke="rgba(255,255,255,0.6)" stroke-width="1.5" fill="none" stroke-linecap="round">
+                <path d="M35 55 L35 75 L45 85"/>
+                <path d="M35 65 L25 65"/>
+                <path d="M45 45 L45 60 L55 70 L55 90"/>
+                <path d="M55 55 L65 55"/>
+                <path d="M55 70 L70 70"/>
+                <circle cx="35" cy="55" r="2.5" fill="rgba(255,255,255,0.8)"/>
+                <circle cx="25" cy="65" r="2" fill="rgba(255,255,255,0.8)"/>
+                <circle cx="45" cy="45" r="2.5" fill="rgba(255,255,255,0.8)"/>
+                <circle cx="45" cy="85" r="2" fill="rgba(255,255,255,0.8)"/>
+                <circle cx="65" cy="55" r="2" fill="rgba(255,255,255,0.8)"/>
+                <circle cx="55" cy="90" r="2.5" fill="rgba(255,255,255,0.8)"/>
+                <circle cx="70" cy="70" r="2" fill="rgba(255,255,255,0.8)"/>
+              </g>
             </svg>
           </div>
         </div>
@@ -328,21 +354,17 @@ const handleLogin = async () => {
     margin-bottom: 16px;
     
     .logo-icon {
-      width: 64px;
-      height: 64px;
+      width: 80px;
+      height: 96px;
       margin: 0 auto;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
-      border-radius: 16px;
-      color: white;
-      box-shadow: 0 8px 20px rgba(24, 144, 255, 0.4);
       animation: logo-pulse 2s ease-in-out infinite;
       
       svg {
-        width: 36px;
-        height: 36px;
+        width: 100%;
+        height: 100%;
       }
     }
   }
@@ -365,11 +387,9 @@ const handleLogin = async () => {
 @keyframes logo-pulse {
   0%, 100% {
     transform: scale(1);
-    box-shadow: 0 8px 20px rgba(24, 144, 255, 0.4);
   }
   50% {
     transform: scale(1.05);
-    box-shadow: 0 12px 30px rgba(24, 144, 255, 0.5);
   }
 }
 

@@ -43,6 +43,12 @@ const routes = [
         component: () => import('@/views/notice/Index.vue'),
         meta: { title: '公告管理', icon: 'Bell', roles: [1] }
       },
+      {
+        path: 'repair',
+        name: 'Repair',
+        component: () => import('@/views/repair/Index.vue'),
+        meta: { title: '报修工单', icon: 'Tools', roles: [1, 3] }
+      },
       // ========== 管理员 + 抄表员 ==========
       {
         path: 'waterMeter',
@@ -68,6 +74,12 @@ const routes = [
         name: 'MyPayment',
         component: () => import('@/views/myPayment/Index.vue'),
         meta: { title: '我的缴费', icon: 'Money', roles: [2] }
+      },
+      {
+        path: 'myRepair',
+        name: 'MyRepair',
+        component: () => import('@/views/myRepair/Index.vue'),
+        meta: { title: '我的报修', icon: 'Tools', roles: [2] }
       },
       // ========== 普通用户 + 抄表员 ==========
       {

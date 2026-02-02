@@ -48,6 +48,101 @@
       </el-col>
     </el-row>
     
+    <!-- 图表区域（仅管理员显示） -->
+    <el-row :gutter="20" class="chart-row" v-if="isAdmin">
+      <!-- 用水量趋势图 -->
+      <el-col :xs="24" :lg="16">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <el-icon class="header-icon"><TrendCharts /></el-icon>
+                <span>用水量趋势（近6个月）</span>
+              </div>
+            </div>
+          </template>
+          <div ref="usageTrendChartRef" class="chart-container"></div>
+        </el-card>
+      </el-col>
+      
+      <!-- 水表类型分布 -->
+      <el-col :xs="24" :lg="8">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <el-icon class="header-icon"><PieChart /></el-icon>
+                <span>水表类型分布</span>
+              </div>
+            </div>
+          </template>
+          <div ref="meterPieChartRef" class="chart-container"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 第二行图表（仅管理员显示） -->
+    <el-row :gutter="20" class="chart-row" v-if="isAdmin">
+      <!-- 缴费状态统计 -->
+      <el-col :xs="24" :lg="8">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <el-icon class="header-icon"><Coin /></el-icon>
+                <span>缴费状态统计</span>
+              </div>
+            </div>
+          </template>
+          <div ref="paymentPieChartRef" class="chart-container"></div>
+        </el-card>
+      </el-col>
+      
+      <!-- 用户类型分布 -->
+      <el-col :xs="24" :lg="8">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <el-icon class="header-icon"><User /></el-icon>
+                <span>用户类型分布</span>
+              </div>
+            </div>
+          </template>
+          <div ref="userPieChartRef" class="chart-container"></div>
+        </el-card>
+      </el-col>
+
+      <!-- 最近公告 -->
+      <el-col :xs="24" :lg="8">
+        <el-card class="chart-card notice-card">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <el-icon class="header-icon"><Bell /></el-icon>
+                <span>最新公告</span>
+              </div>
+              <el-button type="primary" link @click="$router.push('/notice')">
+                查看更多 <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </template>
+          <div class="notice-list">
+            <div class="notice-item" v-for="notice in recentNotices" :key="notice.id">
+              <div class="notice-tag">
+                <el-tag :type="getNoticeType(notice.type)" size="small">{{ getNoticeTypeName(notice.type) }}</el-tag>
+              </div>
+              <div class="notice-content">
+                <h4>{{ notice.title }}</h4>
+                <p>{{ notice.date }}</p>
+              </div>
+            </div>
+            <el-empty v-if="recentNotices.length === 0" description="暂无公告" :image-size="80" />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+    
     <!-- 快捷操作 -->
     <el-row :gutter="20" class="action-row">
       <el-col :span="24">
@@ -68,8 +163,8 @@
       </el-col>
     </el-row>
     
-    <!-- 内容区域 -->
-    <el-row :gutter="20" class="content-row">
+    <!-- 非管理员的内容区域 -->
+    <el-row :gutter="20" class="content-row" v-if="!isAdmin">
       <!-- 最近公告 -->
       <el-col :xs="24" :lg="12">
         <el-card class="content-card notice-card">
@@ -79,7 +174,7 @@
                 <el-icon class="header-icon"><Bell /></el-icon>
                 <span>最新公告</span>
               </div>
-              <el-button type="primary" link @click="$router.push(isAdmin ? '/notice' : '/noticeList')">
+              <el-button type="primary" link @click="$router.push('/noticeList')">
                 查看更多 <el-icon><ArrowRight /></el-icon>
               </el-button>
             </div>
@@ -133,9 +228,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, markRaw } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import * as echarts from 'echarts'
 import {
   User,
   Monitor,
@@ -151,16 +247,32 @@ import {
   Search,
   DataAnalysis,
   Promotion,
-  Lightning
+  Lightning,
+  TrendCharts,
+  PieChart,
+  Coin
 } from '@element-plus/icons-vue'
 import { getUserPage } from '@/api/user'
 import { getMeterPage } from '@/api/waterMeter'
 import { getUsagePage } from '@/api/waterUsage'
 import { getPaymentPage } from '@/api/payment'
 import { getNoticePage } from '@/api/notice'
+import { getUsageTrend, getMeterDistribution, getUserDistribution, getPaymentStatus } from '@/api/statistics'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+// 图表引用
+const usageTrendChartRef = ref(null)
+const meterPieChartRef = ref(null)
+const userPieChartRef = ref(null)
+const paymentPieChartRef = ref(null)
+
+// 图表实例
+let usageTrendChart = null
+let meterPieChart = null
+let userPieChart = null
+let paymentPieChart = null
 
 // 角色判断
 const userType = computed(() => userStore.userInfo?.userType)
@@ -303,9 +415,291 @@ const loadRecentNotices = async () => {
   }
 }
 
+// 初始化图表（仅管理员）
+const initCharts = async () => {
+  if (!isAdmin.value) return
+
+  await nextTick()
+
+  // 初始化用水量趋势图
+  if (usageTrendChartRef.value) {
+    usageTrendChart = echarts.init(usageTrendChartRef.value)
+    loadUsageTrendChart()
+  }
+
+  // 初始化水表类型分布图
+  if (meterPieChartRef.value) {
+    meterPieChart = echarts.init(meterPieChartRef.value)
+    loadMeterPieChart()
+  }
+
+  // 初始化用户类型分布图
+  if (userPieChartRef.value) {
+    userPieChart = echarts.init(userPieChartRef.value)
+    loadUserPieChart()
+  }
+
+  // 初始化缴费状态图
+  if (paymentPieChartRef.value) {
+    paymentPieChart = echarts.init(paymentPieChartRef.value)
+    loadPaymentPieChart()
+  }
+}
+
+// 加载用水量趋势图
+const loadUsageTrendChart = async () => {
+  try {
+    const res = await getUsageTrend()
+    if (res.code === 200) {
+      const { months, usageData, amountData } = res.data
+      
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' }
+        },
+        legend: {
+          data: ['用水量(m³)', '费用(元)'],
+          bottom: 0
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '15%',
+          top: '10%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          data: months,
+          axisLine: { lineStyle: { color: '#ddd' } },
+          axisLabel: { color: '#666' }
+        },
+        yAxis: [
+          {
+            type: 'value',
+            name: '用水量(m³)',
+            axisLine: { lineStyle: { color: '#5B8FF9' } },
+            axisLabel: { color: '#666' }
+          },
+          {
+            type: 'value',
+            name: '费用(元)',
+            axisLine: { lineStyle: { color: '#5AD8A6' } },
+            axisLabel: { color: '#666' }
+          }
+        ],
+        series: [
+          {
+            name: '用水量(m³)',
+            type: 'bar',
+            data: usageData,
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#5B8FF9' },
+                { offset: 1, color: '#85C1E9' }
+              ]),
+              borderRadius: [4, 4, 0, 0]
+            }
+          },
+          {
+            name: '费用(元)',
+            type: 'line',
+            yAxisIndex: 1,
+            data: amountData,
+            smooth: true,
+            itemStyle: { color: '#5AD8A6' },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(90, 216, 166, 0.3)' },
+                { offset: 1, color: 'rgba(90, 216, 166, 0.05)' }
+              ])
+            }
+          }
+        ]
+      }
+      
+      usageTrendChart?.setOption(option)
+    }
+  } catch (error) {
+    console.error('加载用水趋势图失败', error)
+  }
+}
+
+// 加载水表类型分布图
+const loadMeterPieChart = async () => {
+  try {
+    const res = await getMeterDistribution()
+    if (res.code === 200) {
+      const option = {
+        tooltip: {
+          trigger: 'item',
+          formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+          orient: 'vertical',
+          right: 10,
+          top: 'center'
+        },
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['35%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 8,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 14,
+                fontWeight: 'bold'
+              }
+            },
+            data: res.data.map((item, index) => ({
+              ...item,
+              itemStyle: {
+                color: ['#5B8FF9', '#5AD8A6', '#F6BD16'][index]
+              }
+            }))
+          }
+        ]
+      }
+      
+      meterPieChart?.setOption(option)
+    }
+  } catch (error) {
+    console.error('加载水表分布图失败', error)
+  }
+}
+
+// 加载用户类型分布图
+const loadUserPieChart = async () => {
+  try {
+    const res = await getUserDistribution()
+    if (res.code === 200) {
+      const option = {
+        tooltip: {
+          trigger: 'item',
+          formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+          orient: 'vertical',
+          right: 10,
+          top: 'center'
+        },
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['35%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 8,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 14,
+                fontWeight: 'bold'
+              }
+            },
+            data: res.data.map((item, index) => ({
+              ...item,
+              itemStyle: {
+                color: ['#E8684A', '#5B8FF9', '#F6BD16'][index]
+              }
+            }))
+          }
+        ]
+      }
+      
+      userPieChart?.setOption(option)
+    }
+  } catch (error) {
+    console.error('加载用户分布图失败', error)
+  }
+}
+
+// 加载缴费状态图
+const loadPaymentPieChart = async () => {
+  try {
+    const res = await getPaymentStatus()
+    if (res.code === 200) {
+      const option = {
+        tooltip: {
+          trigger: 'item',
+          formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+          orient: 'vertical',
+          right: 10,
+          top: 'center'
+        },
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['35%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderRadius: 8,
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false },
+            emphasis: {
+              label: {
+                show: true,
+                fontSize: 14,
+                fontWeight: 'bold'
+              }
+            },
+            data: res.data.map((item, index) => ({
+              ...item,
+              itemStyle: {
+                color: ['#F6BD16', '#5AD8A6', '#E8684A'][index]
+              }
+            }))
+          }
+        ]
+      }
+      
+      paymentPieChart?.setOption(option)
+    }
+  } catch (error) {
+    console.error('加载缴费状态图失败', error)
+  }
+}
+
+// 窗口大小改变时重绘图表
+const handleResize = () => {
+  usageTrendChart?.resize()
+  meterPieChart?.resize()
+  userPieChart?.resize()
+  paymentPieChart?.resize()
+}
+
 onMounted(() => {
   loadStatistics()
   loadRecentNotices()
+  initCharts()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  usageTrendChart?.dispose()
+  meterPieChart?.dispose()
+  userPieChart?.dispose()
+  paymentPieChart?.dispose()
 })
 
 const animateNumber = (index, target) => {
@@ -584,6 +978,30 @@ const features = computed(() => {
 }
 
 // ==========================================
+// 图表区域
+// ==========================================
+.chart-row {
+  margin-bottom: 24px;
+}
+
+.chart-card {
+  height: 100%;
+  
+  :deep(.el-card__header) {
+    padding: 16px 20px;
+  }
+  
+  :deep(.el-card__body) {
+    padding: 16px 20px;
+  }
+}
+
+.chart-container {
+  width: 100%;
+  height: 280px;
+}
+
+// ==========================================
 // 快捷操作
 // ==========================================
 .quick-actions {
@@ -813,6 +1231,10 @@ const features = computed(() => {
   
   .feature-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .chart-container {
+    height: 220px;
   }
 }
 </style>
