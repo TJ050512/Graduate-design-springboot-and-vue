@@ -80,9 +80,9 @@ public class RepairOrderController {
         return Result.success(result);
     }
 
-    @Operation(summary = "开始处理工单")
+    @Operation(summary = "开始处理工单（接单）")
     @PutMapping("/handle/{id}")
-    @RequireRole(roles = {1, 3}, description = "管理员和抄表员可处理工单")
+    @RequireRole(roles = {4}, description = "仅维修人员可接单处理")
     public Result<Boolean> handleOrder(@PathVariable Long id, HttpServletRequest request) {
         Long handlerId = (Long) request.getAttribute("userId");
         boolean result = repairOrderService.handleOrder(id, handlerId);
@@ -91,10 +91,19 @@ public class RepairOrderController {
 
     @Operation(summary = "完成工单")
     @PutMapping("/complete/{id}")
-    @RequireRole(roles = {1, 3}, description = "管理员和抄表员可完成工单")
+    @RequireRole(roles = {4}, description = "仅维修人员可完成工单")
     public Result<Boolean> completeOrder(@PathVariable Long id, @RequestBody Map<String, String> params) {
         String handleResult = params.get("handleResult");
         boolean result = repairOrderService.completeOrder(id, handleResult);
+        return Result.success(result);
+    }
+
+    @Operation(summary = "处理失败，转派工单")
+    @PutMapping("/fail/{id}")
+    @RequireRole(roles = {4}, description = "仅维修人员可标记工单处理失败")
+    public Result<Boolean> failOrder(@PathVariable Long id, @RequestBody Map<String, String> params) {
+        String failReason = params.get("failReason");
+        boolean result = repairOrderService.failOrder(id, failReason);
         return Result.success(result);
     }
 

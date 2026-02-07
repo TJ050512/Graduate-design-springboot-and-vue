@@ -75,6 +75,13 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="priority" label="紧急度" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getPriorityType(row.priority)" effect="dark" size="small">
+              {{ getPriorityName(row.priority) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag 
@@ -245,6 +252,11 @@
             {{ getRepairTypeName(currentOrder.repairType) }}
           </el-tag>
         </el-descriptions-item>
+        <el-descriptions-item label="紧急度">
+          <el-tag :type="getPriorityType(currentOrder.priority)" effect="dark">
+            {{ getPriorityName(currentOrder.priority) }}
+          </el-tag>
+        </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentOrder.status)" effect="light">
             {{ getStatusName(currentOrder.status) }}
@@ -309,7 +321,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { getRepairOrderPage, getRepairOrderById, createRepairOrder, cancelOrder, feedbackOrder } from '@/api/repair'
-import { getMeterPage } from '@/api/waterMeter'
+import { getMyMeters } from '@/api/waterMeter'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -397,6 +409,16 @@ const getRepairTypeTag = (type) => {
   return types[type] || 'info'
 }
 
+const getPriorityName = (priority) => {
+  const names = { 1: '紧急', 2: '普通', 3: '低' }
+  return names[priority] || '普通'
+}
+
+const getPriorityType = (priority) => {
+  const types = { 1: 'danger', 2: 'warning', 3: 'success' }
+  return types[priority] || 'warning'
+}
+
 const getStatusName = (status) => {
   const names = { 0: '待处理', 1: '处理中', 2: '已完成', 3: '已取消' }
   return names[status] || '未知'
@@ -414,9 +436,9 @@ const getStatusClass = (status) => {
 
 const loadMeterList = async () => {
   try {
-    const res = await getMeterPage({ page: 1, size: 1000, userId: userStore.userInfo?.userId })
+    const res = await getMyMeters()
     if (res.code === 200) {
-      meterList.value = res.data.records
+      meterList.value = res.data
     }
   } catch (error) {
     console.error('加载水表列表失败', error)

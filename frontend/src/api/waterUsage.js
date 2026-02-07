@@ -51,3 +51,12 @@ export function deleteUsage(id) {
   })
 }
 
+// 获取用户用水统计
+export function getUsageStatistics(userId) {
+  return request({
+    url: '/waterUsage/statistics',
+    method: 'get',
+    params: { userId }
+  })
+}
+

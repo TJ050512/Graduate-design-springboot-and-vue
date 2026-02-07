@@ -4,14 +4,87 @@
     <div class="page-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
       <div class="header-info">
         <h2>水表管理</h2>
-        <p>管理系统中的水表信息，包括添加、编辑和删除水表</p>
+        <p>{{ isAdmin ? '管理系统中的水表信息，包括添加、编辑和删除水表' : '查看水表信息，读数由系统自动更新' }}</p>
       </div>
-      <el-button type="primary" @click="handleAdd">
-        <el-icon><Plus /></el-icon>
-        添加水表
-      </el-button>
+      <div class="header-actions">
+        <el-button @click="loadData" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          刷新读数
+        </el-button>
+        <el-button v-if="isAdmin" type="primary" @click="handleAdd">
+          <el-icon><Plus /></el-icon>
+          添加水表
+        </el-button>
+      </div>
     </div>
     
+    <!-- 模拟器控制面板（仅管理员可见） -->
+    <el-card v-if="isAdmin" class="simulator-card">
+      <template #header>
+        <div class="simulator-header">
+          <div class="simulator-title">
+            <el-icon><Timer /></el-icon>
+            <span>水表模拟器控制</span>
+          </div>
+          <el-tag :type="simulatorStatus.enabled ? 'success' : 'danger'" effect="plain">
+            {{ simulatorStatus.enabled ? '运行中' : '已停止' }}
+          </el-tag>
+        </div>
+      </template>
+      <div class="simulator-content">
+        <div class="simulator-controls">
+          <div class="control-item">
+            <span class="control-label">模拟器开关</span>
+            <el-switch
+              v-model="simulatorStatus.enabled"
+              @change="handleToggleSimulator"
+              active-text="开启"
+              inactive-text="关闭"
+            />
+          </div>
+          <div class="control-item">
+            <span class="control-label">时间流速</span>
+            <div class="speed-control">
+              <el-slider
+                v-model="simulatorStatus.speedMultiplier"
+                :min="1"
+                :max="100"
+                :step="1"
+                show-input
+                :show-input-controls="false"
+                @change="handleSpeedChange"
+              />
+              <span class="speed-unit">倍速</span>
+            </div>
+          </div>
+          <div class="control-item">
+            <span class="control-label">快捷设置</span>
+            <div class="speed-presets">
+              <el-button size="small" @click="setSpeed(1)">1x 真实</el-button>
+              <el-button size="small" @click="setSpeed(10)">10x</el-button>
+              <el-button size="small" @click="setSpeed(50)">50x</el-button>
+              <el-button size="small" type="primary" @click="setSpeed(100)">100x 演示</el-button>
+            </div>
+          </div>
+          <div class="control-item">
+            <span class="control-label">手动触发</span>
+            <el-button type="success" @click="handleTriggerSimulation" :loading="triggerLoading">
+              <el-icon><VideoPlay /></el-icon>
+              立即模拟一次
+            </el-button>
+          </div>
+        </div>
+        <div class="simulator-info">
+          <el-descriptions :column="3" size="small" border>
+            <el-descriptions-item label="家用表速率">{{ (0.0005 * simulatorStatus.speedMultiplier).toFixed(4) }} m³/分钟</el-descriptions-item>
+            <el-descriptions-item label="商用表速率">{{ (0.002 * simulatorStatus.speedMultiplier).toFixed(4) }} m³/分钟</el-descriptions-item>
+            <el-descriptions-item label="工业表速率">{{ (0.01 * simulatorStatus.speedMultiplier).toFixed(4) }} m³/分钟</el-descriptions-item>
+          </el-descriptions>
+          <div class="update-tip">数据每10秒自动更新一次，页面每10秒自动刷新</div>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -74,9 +147,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="currentReading" label="当前读数" width="120" align="center">
+        <el-table-column prop="currentReading" label="当前读数" width="140" align="center">
           <template #default="{ row }">
-            <span class="reading-value">{{ row.currentReading || 0 }} <small>m³</small></span>
+            <span class="reading-value">{{ Number(row.currentReading || 0).toFixed(4) }} <small>m³</small></span>
           </template>
         </el-table-column>
         <el-table-column prop="installAddress" label="安装地址" min-width="200" show-overflow-tooltip />
@@ -92,7 +165,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" align="center" fixed="right">
+        <el-table-column v-if="isAdmin" label="操作" width="180" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button type="primary" link @click="handleEdit(row)">
@@ -145,6 +218,21 @@
             :prefix-icon="Monitor"
           />
         </el-form-item>
+        <el-form-item label="所属用户" prop="userId">
+          <el-select 
+            v-model="formData.userId" 
+            placeholder="请选择所属用户" 
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="user in userList"
+              :key="user.userId"
+              :label="`${user.realName} (${user.username})`"
+              :value="user.userId"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="水表类型" prop="meterType">
           <el-radio-group v-model="formData.meterType" class="type-radio-group">
             <el-radio-button :value="1">
@@ -168,14 +256,15 @@
             :prefix-icon="Location"
           />
         </el-form-item>
-        <el-form-item label="当前读数" prop="currentReading">
-          <el-input-number
+        <el-form-item label="当前读数">
+          <el-input
             v-model="formData.currentReading"
-            :precision="2"
-            :min="0"
-            :step="0.01"
+            disabled
             style="width: 100%"
-          />
+          >
+            <template #append>m³</template>
+          </el-input>
+          <div class="form-tip">当前读数由系统自动模拟更新，无法手动修改</div>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-switch
@@ -201,8 +290,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, markRaw } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, markRaw, computed } from 'vue'
 import { getMeterPage, addMeter, updateMeter, deleteMeter } from '@/api/waterMeter'
+import { getSimulatorStatus, toggleSimulator, setSimulatorSpeed, triggerSimulation } from '@/api/waterMeter'
+import { getUserPage } from '@/api/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
@@ -214,12 +305,34 @@ import {
   Location,
   HomeFilled,
   OfficeBuilding,
-  SetUp
+  SetUp,
+  User,
+  Timer,
+  VideoPlay
 } from '@element-plus/icons-vue'
+
+// 判断当前用户是否是管理员（userType: 1=管理员, 2=普通用户, 3=抄表员）
+const isAdmin = computed(() => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  return userInfo.userType === 1
+})
+
+// 模拟器状态
+const simulatorStatus = reactive({
+  enabled: true,
+  speedMultiplier: 10
+})
+
+// 手动触发模拟的加载状态
+const triggerLoading = ref(false)
+
+// 自动刷新定时器
+let autoRefreshTimer = null
 
 const loading = ref(false)
 const submitLoading = ref(false)
 const tableData = ref([])
+const userList = ref([])
 const dialogVisible = ref(false)
 const dialogTitle = ref('添加水表')
 const formRef = ref(null)
@@ -238,6 +351,7 @@ const pagination = reactive({
 const formData = reactive({
   meterId: null,
   meterNo: '',
+  userId: null,
   meterType: 1,
   installAddress: '',
   currentReading: 0,
@@ -246,6 +360,7 @@ const formData = reactive({
 
 const formRules = {
   meterNo: [{ required: true, message: '请输入水表编号', trigger: 'blur' }],
+  userId: [{ required: true, message: '请选择所属用户', trigger: 'change' }],
   meterType: [{ required: true, message: '请选择水表类型', trigger: 'change' }],
   installAddress: [{ required: true, message: '请输入安装地址', trigger: 'blur' }]
 }
@@ -299,11 +414,23 @@ const handleReset = () => {
   handleSearch()
 }
 
+const loadUserList = async () => {
+  try {
+    const res = await getUserPage({ page: 1, size: 100, userType: 2 })
+    if (res.code === 200) {
+      userList.value = res.data.records
+    }
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const handleAdd = () => {
   dialogTitle.value = '添加水表'
   Object.assign(formData, {
     meterId: null,
     meterNo: '',
+    userId: null,
     meterType: 1,
     installAddress: '',
     currentReading: 0,
@@ -379,8 +506,83 @@ const handleCurrentChange = () => {
   loadData()
 }
 
+// ========== 模拟器控制相关 ==========
+const loadSimulatorStatus = async () => {
+  try {
+    const res = await getSimulatorStatus()
+    if (res.code === 200) {
+      simulatorStatus.enabled = res.data.enabled
+      simulatorStatus.speedMultiplier = res.data.speedMultiplier
+    }
+  } catch (error) {
+    console.error('获取模拟器状态失败', error)
+  }
+}
+
+const handleToggleSimulator = async (enabled) => {
+  try {
+    const res = await toggleSimulator(enabled)
+    if (res.code === 200) {
+      ElMessage.success(enabled ? '模拟器已启动' : '模拟器已停止')
+    }
+  } catch (error) {
+    simulatorStatus.enabled = !enabled
+    ElMessage.error('操作失败')
+  }
+}
+
+const handleSpeedChange = async (speed) => {
+  try {
+    const res = await setSimulatorSpeed(speed)
+    if (res.code === 200) {
+      ElMessage.success(`速度已设置为 ${speed} 倍`)
+    }
+  } catch (error) {
+    ElMessage.error('设置失败')
+  }
+}
+
+const setSpeed = (speed) => {
+  simulatorStatus.speedMultiplier = speed
+  handleSpeedChange(speed)
+}
+
+const handleTriggerSimulation = async () => {
+  triggerLoading.value = true
+  try {
+    const res = await triggerSimulation()
+    if (res.code === 200) {
+      ElMessage.success('模拟已执行')
+      // 立即刷新数据
+      await loadData()
+    }
+  } catch (error) {
+    ElMessage.error('触发失败')
+  } finally {
+    triggerLoading.value = false
+  }
+}
+
 onMounted(() => {
   loadData()
+  loadUserList()
+  
+  // 管理员加载模拟器状态
+  if (isAdmin.value) {
+    loadSimulatorStatus()
+  }
+  
+  // 每10秒自动刷新数据，以便看到模拟器的效果
+  autoRefreshTimer = setInterval(() => {
+    loadData()
+  }, 10000)
+})
+
+onUnmounted(() => {
+  // 清除定时器
+  if (autoRefreshTimer) {
+    clearInterval(autoRefreshTimer)
+  }
 })
 </script>
 
@@ -422,6 +624,11 @@ onMounted(() => {
       opacity: 0.85;
     }
   }
+
+  .header-actions {
+    display: flex;
+    gap: 12px;
+  }
   
   .el-button {
     background: rgba(255, 255, 255, 0.2);
@@ -431,6 +638,103 @@ onMounted(() => {
     &:hover {
       background: rgba(255, 255, 255, 0.3);
       border-color: rgba(255, 255, 255, 0.4);
+    }
+  }
+}
+
+// 表单提示
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+// 模拟器控制面板
+.simulator-card {
+  margin-bottom: 20px;
+  border: 1px solid #e6f7ff;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+  
+  :deep(.el-card__header) {
+    padding: 12px 20px;
+    background: rgba(24, 144, 255, 0.05);
+    border-bottom: 1px solid #e6f7ff;
+  }
+  
+  .simulator-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .simulator-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #1890ff;
+      
+      .el-icon {
+        font-size: 18px;
+      }
+    }
+  }
+  
+  .simulator-content {
+    .simulator-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      margin-bottom: 16px;
+      
+      .control-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        
+        .control-label {
+          font-size: 14px;
+          color: #606266;
+          white-space: nowrap;
+        }
+        
+        .speed-control {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 280px;
+          
+          .el-slider {
+            flex: 1;
+          }
+          
+          .speed-unit {
+            font-size: 14px;
+            color: #909399;
+          }
+        }
+        
+        .speed-presets {
+          display: flex;
+          gap: 8px;
+        }
+      }
+    }
+    
+    .simulator-info {
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      padding: 12px;
+      
+      :deep(.el-descriptions__label) {
+        width: 100px;
+      }
+
+      .update-tip {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #909399;
+        text-align: center;
+      }
     }
   }
 }

@@ -165,7 +165,8 @@ const getDropStyle = (index) => {
 const testAccounts = [
   { username: 'admin', password: 'admin123', label: '管理员', type: 'danger' },
   { username: 'user001', password: '123456', label: '普通用户', type: 'success' },
-  { username: 'reader001', password: '123456', label: '抄表员', type: 'warning' }
+  { username: 'reader001', password: '123456', label: '抄表员', type: 'warning' },
+  { username: 'repair001', password: '123456', label: '维修人员', type: 'primary' }
 ]
 
 // 填充测试账号

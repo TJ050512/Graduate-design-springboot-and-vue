@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS `payment` (
     `payment_time` DATETIME COMMENT '缴费时间',
     `transaction_no` VARCHAR(100) COMMENT '交易流水号',
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态(0:待支付 1:已支付 2:已退款)',
+    `need_remind` TINYINT DEFAULT 0 COMMENT '是否需要提醒(0:不需要 1:需要)',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `create_by` BIGINT COMMENT '创建人',
@@ -206,6 +207,10 @@ VALUES ('user001', 'e10adc3949ba59abbe56e057f20f883e', '张三', 1, '13800138001
 INSERT INTO `sys_user` (`username`, `password`, `real_name`, `gender`, `phone`, `user_type`, `status`) 
 VALUES ('reader001', 'e10adc3949ba59abbe56e057f20f883e', '李四', 1, '13800138002', 3, 1);
 
+-- 插入测试维修人员 (密码: 123456 经过MD5加密)
+INSERT INTO `sys_user` (`username`, `password`, `real_name`, `gender`, `phone`, `user_type`, `status`) 
+VALUES ('repair001', 'e10adc3949ba59abbe56e057f20f883e', '王五', 1, '13800138003', 4, 1);
+
 -- 插入水费价格配置
 INSERT INTO `water_price` (`meter_type`, `tier`, `start_usage`, `end_usage`, `price`, `effective_date`, `status`, `remark`) 
 VALUES 
@@ -214,6 +219,28 @@ VALUES
 (1, 3, 25.00, NULL, 6.00, '2024-01-01', 1, '居民用水第三档'),
 (2, 0, 0.00, NULL, 4.50, '2024-01-01', 1, '商业用水'),
 (3, 0, 0.00, NULL, 3.50, '2024-01-01', 1, '工业用水');
+
+-- 抄表任务表
+CREATE TABLE IF NOT EXISTS `meter_read_task` (
+    `task_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+    `meter_id` BIGINT NOT NULL COMMENT '水表ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID(水表所属用户)',
+    `last_reading` DECIMAL(12, 4) NOT NULL COMMENT '上次抄表读数',
+    `current_reading` DECIMAL(12, 4) NOT NULL COMMENT '当前水表读数(发通知时)',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态(0:待抄表 1:已完成)',
+    `notified_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '通知时间',
+    `completed_at` DATETIME COMMENT '完成时间',
+    `usage_id` BIGINT COMMENT '关联的用水记录ID(完成后)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `create_by` BIGINT COMMENT '创建人',
+    `update_by` BIGINT COMMENT '更新人',
+    `deleted` TINYINT DEFAULT 0 COMMENT '逻辑删除(0:未删除 1:已删除)',
+    `remark` VARCHAR(500) COMMENT '备注',
+    PRIMARY KEY (`task_id`),
+    KEY `idx_meter_id` (`meter_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='抄表任务表';
 
 -- 插入示例公告
 INSERT INTO `notice` (`title`, `content`, `notice_type`, `status`, `is_top`) 

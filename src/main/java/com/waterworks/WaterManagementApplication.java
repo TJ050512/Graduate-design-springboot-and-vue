@@ -3,6 +3,7 @@ package com.waterworks;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * 水务管理系统启动类
@@ -12,6 +13,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  */
 @SpringBootApplication
 @MapperScan("com.waterworks.mapper")
+@EnableScheduling
 public class WaterManagementApplication {
 
     public static void main(String[] args) {

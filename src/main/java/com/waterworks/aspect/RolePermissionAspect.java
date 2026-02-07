@@ -102,6 +102,7 @@ public class RolePermissionAspect {
             case 1: return "管理员";
             case 2: return "普通用户";
             case 3: return "抄表员";
+            case 4: return "维修人员";
             default: return "未知角色";
         }
     }

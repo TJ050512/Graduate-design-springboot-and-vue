@@ -8,10 +8,12 @@ import com.waterworks.entity.WaterMeter;
 import com.waterworks.service.WaterMeterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.util.List;
 
 /**
  * 水表控制器
@@ -51,6 +53,14 @@ public class WaterMeterController {
         return Result.success(waterMeter);
     }
 
+    @Operation(summary = "查询当前用户的水表列表")
+    @GetMapping("/my")
+    public Result<List<WaterMeter>> getMyMeters(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        List<WaterMeter> meters = waterMeterService.getMetersByUserId(userId);
+        return Result.success(meters);
+    }
+
     @Operation(summary = "添加水表")
     @PostMapping
     @RequireRole(roles = {1}, description = "仅管理员可添加水表")
@@ -59,10 +69,16 @@ public class WaterMeterController {
         return Result.success(result);
     }
 
-    @Operation(summary = "更新水表")
+    @Operation(summary = "更新水表信息（不包含当前读数，读数由系统自动更新）")
     @PutMapping
-    @RequireRole(roles = {1, 3}, description = "管理员和抄表员可更新水表")
+    @RequireRole(roles = {1}, description = "仅管理员可更新水表基本信息")
     public Result<Boolean> updateMeter(@Valid @RequestBody WaterMeter waterMeter) {
+        // 不允许通过此接口修改当前读数，当前读数由水表模拟器自动更新
+        // 获取原水表数据，保留当前读数不变
+        WaterMeter existingMeter = waterMeterService.getById(waterMeter.getMeterId());
+        if (existingMeter != null) {
+            waterMeter.setCurrentReading(existingMeter.getCurrentReading());
+        }
         boolean result = waterMeterService.updateMeter(waterMeter);
         return Result.success(result);
     }

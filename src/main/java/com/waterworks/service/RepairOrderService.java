@@ -59,6 +59,15 @@ public interface RepairOrderService extends IService<RepairOrder> {
     boolean completeOrder(Long orderId, String handleResult);
 
     /**
+     * 处理失败，转派工单
+     *
+     * @param orderId    工单ID
+     * @param failReason 失败原因
+     * @return 是否成功
+     */
+    boolean failOrder(Long orderId, String failReason);
+
+    /**
      * 取消工单
      *
      * @param orderId 工单ID

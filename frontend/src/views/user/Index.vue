@@ -28,6 +28,7 @@
             <el-option label="管理员" :value="1" />
             <el-option label="普通用户" :value="2" />
             <el-option label="抄表员" :value="3" />
+            <el-option label="维修人员" :value="4" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -182,6 +183,10 @@
               <el-icon><Compass /></el-icon>
               抄表员
             </el-radio-button>
+            <el-radio-button :value="4">
+              <el-icon><SetUp /></el-icon>
+              维修人员
+            </el-radio-button>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="状态" prop="status">
@@ -222,7 +227,8 @@ import {
   Phone,
   Postcard,
   StarFilled,
-  Compass
+  Compass,
+  SetUp
 } from '@element-plus/icons-vue'
 
 const loading = ref(false)
@@ -260,12 +266,12 @@ const formRules = {
 }
 
 const getUserTypeName = (type) => {
-  const names = { 1: '管理员', 2: '普通用户', 3: '抄表员' }
+  const names = { 1: '管理员', 2: '普通用户', 3: '抄表员', 4: '维修人员' }
   return names[type] || '未知'
 }
 
 const getUserTypeTag = (type) => {
-  const tags = { 1: 'danger', 2: 'success', 3: 'warning' }
+  const tags = { 1: 'danger', 2: 'success', 3: 'warning', 4: 'primary' }
   return tags[type] || 'info'
 }
 
@@ -273,7 +279,8 @@ const getUserTypeIcon = (type) => {
   const icons = { 
     1: markRaw(StarFilled), 
     2: markRaw(User), 
-    3: markRaw(Compass) 
+    3: markRaw(Compass),
+    4: markRaw(SetUp)
   }
   return icons[type] || markRaw(User)
 }

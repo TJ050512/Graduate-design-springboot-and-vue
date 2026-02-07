@@ -83,7 +83,7 @@
         stripe
         highlight-current-row
       >
-        <el-table-column prop="paymentNo" label="缴费单号" width="180">
+        <el-table-column prop="paymentNo" label="缴费单号" min-width="200">
           <template #default="{ row }">
             <span class="payment-no">{{ row.paymentNo }}</span>
           </template>
@@ -156,12 +156,38 @@
         </div>
         <el-descriptions :column="1" border size="small">
           <el-descriptions-item label="缴费单号">{{ currentPayment.paymentNo }}</el-descriptions-item>
-          <el-descriptions-item label="支付方式">
-            <el-tag :type="getPaymentMethodType(currentPayment.paymentMethod)" effect="light">
-              {{ getPaymentMethodName(currentPayment.paymentMethod) }}
-            </el-tag>
-          </el-descriptions-item>
         </el-descriptions>
+        
+        <!-- 支付方式选择 -->
+        <div class="payment-method-section">
+          <div class="section-title">选择支付方式</div>
+          <el-radio-group v-model="selectedPaymentMethod" class="payment-method-group">
+            <el-radio :value="2" class="payment-method-item">
+              <div class="method-content">
+                <span class="method-icon wechat">微信</span>
+                <span class="method-name">微信支付</span>
+              </div>
+            </el-radio>
+            <el-radio :value="3" class="payment-method-item">
+              <div class="method-content">
+                <span class="method-icon alipay">支付宝</span>
+                <span class="method-name">支付宝</span>
+              </div>
+            </el-radio>
+            <el-radio :value="4" class="payment-method-item">
+              <div class="method-content">
+                <span class="method-icon bank">银行卡</span>
+                <span class="method-name">银行卡</span>
+              </div>
+            </el-radio>
+            <el-radio :value="1" class="payment-method-item">
+              <div class="method-content">
+                <span class="method-icon cash">现金</span>
+                <span class="method-name">现金支付</span>
+              </div>
+            </el-radio>
+          </el-radio-group>
+        </div>
       </div>
       <template #footer>
         <el-button @click="payDialogVisible = false">取消</el-button>
@@ -200,8 +226,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { getPaymentPage, pay, getPaymentById } from '@/api/payment'
+import { ref, reactive, onMounted } from 'vue'
+import { getPaymentPage, pay, getPaymentById, getPaymentStatistics } from '@/api/payment'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import {
@@ -242,20 +268,27 @@ const currentPayment = reactive({
   transactionNo: ''
 })
 
-// 统计数据
-const totalCount = computed(() => pagination.total)
+// 选择的支付方式
+const selectedPaymentMethod = ref(2) // 默认微信支付
 
-const paidAmount = computed(() => {
-  return tableData.value
-    .filter(item => item.status === 1)
-    .reduce((sum, item) => sum + (item.amount || 0), 0)
-})
+// 统计数据（从后端获取）
+const totalCount = ref(0)
+const paidAmount = ref(0)
+const unpaidAmount = ref(0)
 
-const unpaidAmount = computed(() => {
-  return tableData.value
-    .filter(item => item.status === 0)
-    .reduce((sum, item) => sum + (item.amount || 0), 0)
-})
+// 加载统计数据
+const loadStatistics = async () => {
+  try {
+    const res = await getPaymentStatistics(userStore.userInfo?.userId)
+    if (res.code === 200 && res.data) {
+      totalCount.value = res.data.totalCount || 0
+      paidAmount.value = res.data.paidAmount || 0
+      unpaidAmount.value = res.data.unpaidAmount || 0
+    }
+  } catch (error) {
+    console.error('加载统计数据失败', error)
+  }
+}
 
 const getPaymentMethodName = (method) => {
   const names = { 1: '现金', 2: '微信', 3: '支付宝', 4: '银行卡' }
@@ -300,17 +333,19 @@ const handleReset = () => {
 
 const handlePay = (row) => {
   Object.assign(currentPayment, { ...row })
+  selectedPaymentMethod.value = row.paymentMethod || 2  // 使用已有的支付方式或默认微信
   payDialogVisible.value = true
 }
 
 const handlePayConfirm = async () => {
   payLoading.value = true
   try {
-    const res = await pay(currentPayment.paymentId)
+    const res = await pay(currentPayment.paymentId, selectedPaymentMethod.value)
     if (res.code === 200) {
       ElMessage.success('支付成功')
       payDialogVisible.value = false
       loadData()
+      loadStatistics()  // 刷新统计数据
     }
   } catch (error) {
     console.error(error)
@@ -341,6 +376,7 @@ const handleCurrentChange = () => {
 
 onMounted(() => {
   loadData()
+  loadStatistics()
 })
 </script>
 
@@ -437,6 +473,96 @@ onMounted(() => {
     
     .label { display: block; color: #909399; font-size: 14px; margin-bottom: 8px; }
     .value { font-size: 36px; font-weight: 700; color: #f56c6c; }
+  }
+  
+  .payment-method-section {
+    margin-top: 20px;
+    
+    .section-title {
+      font-size: 14px;
+      color: #606266;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+    
+    .payment-method-group {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      column-gap: 16px !important;
+      row-gap: 30px !important;
+      width: 100%;
+      margin: 0 !important;
+      
+      :deep(.el-radio-group__label) {
+        display: none;
+      }
+      
+      .payment-method-item {
+        margin: 0 !important;
+        display: block;
+        height: auto;
+        
+        :deep(.el-radio) {
+          margin: 0 !important;
+          margin-right: 0 !important;
+          margin-bottom: 0 !important;
+          display: block;
+          height: 100%;
+        }
+        
+        :deep(.el-radio__input) {
+          display: none;
+        }
+        
+        :deep(.el-radio__label) {
+          padding-left: 0;
+          width: 100%;
+          display: block;
+          margin: 0 !important;
+        }
+        
+        .method-content {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 16px;
+          border: 2px solid #e4e7ed;
+          border-radius: 8px;
+          transition: all 0.2s;
+          cursor: pointer;
+          box-sizing: border-box;
+          margin: 0;
+          
+          .method-icon {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            flex-shrink: 0;
+            
+            &.wechat { background: #07c160; color: white; }
+            &.alipay { background: #1677ff; color: white; }
+            &.bank { background: #ff9500; color: white; }
+            &.cash { background: #909399; color: white; }
+          }
+          
+          .method-name {
+            font-size: 14px;
+            color: #303133;
+          }
+        }
+        
+        &:nth-child(1),
+        &:nth-child(2) {
+          margin-bottom: 10px !important;
+        }
+        
+        &.is-checked .method-content {
+          border-color: #409eff;
+          background: #ecf5ff;
+        }
+      }
+    }
   }
 }
 </style>

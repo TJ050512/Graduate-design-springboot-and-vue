@@ -4,14 +4,193 @@
     <div class="page-header" style="background: linear-gradient(135deg, #ee9ca7 0%, #ffdde1 100%);">
       <div class="header-info">
         <h2>用水记录</h2>
-        <p>管理用户的用水记录，包括抄表数据和费用计算</p>
+        <p>{{ isAdmin ? '管理用水记录，通知抄表员进行抄表' : '查看和添加用水记录' }}</p>
       </div>
-      <el-button type="primary" @click="handleAdd">
-        <el-icon><Plus /></el-icon>
-        添加用水记录
-      </el-button>
+      <div class="header-actions">
+        <el-button v-if="isReader" type="primary" @click="handleAdd">
+          <el-icon><Plus /></el-icon>
+          添加用水记录
+        </el-button>
+      </div>
     </div>
     
+    <!-- 管理员：需要抄表的水表面板 -->
+    <el-card v-if="isAdmin" class="notify-card">
+      <template #header>
+        <div class="notify-header">
+          <div class="notify-title">
+            <el-icon><Bell /></el-icon>
+            <span>待抄表水表（读数已变化）</span>
+          </div>
+          <div class="notify-actions">
+            <el-button size="small" @click="loadNeedReadMeters" :loading="needReadLoading">
+              <el-icon><Refresh /></el-icon>
+              刷新
+            </el-button>
+            <el-button size="small" type="warning" @click="handleNotifyAll" :disabled="unnotifiedList.length === 0">
+              <el-icon><Bell /></el-icon>
+              一键通知全部抄表 ({{ unnotifiedList.length }})
+            </el-button>
+          </div>
+        </div>
+      </template>
+      <!-- 未通知的水表 -->
+      <el-table :data="unnotifiedList" v-loading="needReadLoading" size="small" stripe>
+        <el-table-column prop="meterNo" label="水表编号" width="120" />
+        <el-table-column prop="meterType" label="水表类型" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.meterType === 1 ? 'success' : row.meterType === 2 ? 'warning' : ''" size="small" effect="light">
+              {{ {1: '家用表', 2: '商用表', 3: '工业表'}[row.meterType] || '未知' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="用户" width="100">
+          <template #default="{ row }">
+            {{ getUserInfo(row.userId)?.realName || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="installAddress" label="安装地址" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="lastRecordedReading" label="上次记录" width="120" align="right">
+          <template #default="{ row }">
+            <span>{{ Number(row.lastRecordedReading).toFixed(4) }} m³</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="currentReading" label="当前读数" width="120" align="right">
+          <template #default="{ row }">
+            <span style="color: #1890ff; font-weight: bold;">{{ Number(row.currentReading).toFixed(4) }} m³</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="diff" label="变化量" width="110" align="right">
+          <template #default="{ row }">
+            <span style="color: #f56c6c; font-weight: bold;">+{{ Number(row.diff).toFixed(4) }} m³</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="130" align="center">
+          <template #default="{ row }">
+            <el-button 
+              type="warning" 
+              size="small" 
+              @click="handleNotify(row)"
+            >
+              <el-icon><Bell /></el-icon>
+              通知抄表
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="unnotifiedList.length === 0 && !needReadLoading" class="empty-tip">
+        {{ notifiedList.length > 0 ? '所有变化的水表都已通知抄表员' : '当前所有水表读数无变化，无需抄表' }}
+      </div>
+      
+      <!-- 已通知待处理的水表 -->
+      <div v-if="notifiedList.length > 0" class="notified-section">
+        <div class="notified-title">
+          <el-icon><Clock /></el-icon>
+          <span>已通知，等待抄表员处理（{{ notifiedList.length }}）</span>
+        </div>
+        <el-table :data="notifiedList" size="small" stripe>
+          <el-table-column prop="meterNo" label="水表编号" width="120" />
+          <el-table-column prop="meterType" label="水表类型" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.meterType === 1 ? 'success' : row.meterType === 2 ? 'warning' : ''" size="small" effect="light">
+                {{ {1: '家用表', 2: '商用表', 3: '工业表'}[row.meterType] || '未知' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="用户" width="100">
+            <template #default="{ row }">
+              {{ getUserInfo(row.userId)?.realName || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="installAddress" label="安装地址" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="diff" label="通知时变化量" width="130" align="right">
+            <template #default="{ row }">
+              <span style="color: #909399;">+{{ Number(row.diff).toFixed(4) }} m³</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="120" align="center">
+            <template #default>
+              <el-tag type="info" size="small" effect="plain">
+                <el-icon><Clock /></el-icon>
+                等待抄表
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-card>
+    
+    <!-- 抄表员：待处理抄表任务面板 -->
+    <el-card v-if="isReader && pendingTasks.length > 0" class="task-card">
+      <template #header>
+        <div class="task-header">
+          <div class="task-title">
+            <el-icon><EditPen /></el-icon>
+            <span>待处理抄表任务</span>
+            <el-tag type="danger" size="small" effect="dark" round>{{ pendingTasks.length }}</el-tag>
+          </div>
+          <el-button size="small" @click="loadPendingTasks" :loading="taskLoading">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+      </template>
+      <div class="task-list">
+        <div v-for="task in pendingTasks" :key="task.taskId" class="task-item">
+          <div class="task-info">
+            <div class="task-meter">
+              <el-icon><Monitor /></el-icon>
+              <span class="meter-no">水表 {{ getMeterInfo(task.meterId)?.meterNo || task.meterId }}</span>
+              <el-tag :type="getMeterInfo(task.meterId)?.meterType === 1 ? 'success' : getMeterInfo(task.meterId)?.meterType === 2 ? 'warning' : ''" size="small" effect="light">
+                {{ {1: '家用表', 2: '商用表', 3: '工业表'}[getMeterInfo(task.meterId)?.meterType] || '' }}
+              </el-tag>
+              <span class="task-user">
+                <el-icon><User /></el-icon>
+                {{ getUserInfo(task.userId)?.realName || '-' }}
+              </span>
+              <span class="task-address">{{ getMeterInfo(task.meterId)?.installAddress || '' }}</span>
+            </div>
+            <div class="task-readings">
+              <div class="reading-item">
+                <span class="reading-label">上次读数</span>
+                <span class="reading-value">{{ Number(task.lastReading).toFixed(4) }} m³</span>
+              </div>
+              <div class="reading-arrow">→</div>
+              <div class="reading-item current">
+                <span class="reading-label">当前读数</span>
+                <span class="reading-value">{{ Number(getMeterInfo(task.meterId)?.currentReading || task.currentReading).toFixed(4) }} m³</span>
+              </div>
+              <div class="reading-diff">
+                +{{ (Number(getMeterInfo(task.meterId)?.currentReading || task.currentReading) - Number(task.lastReading)).toFixed(4) }} m³
+              </div>
+            </div>
+          </div>
+          <div class="task-action">
+            <div class="task-input-group">
+              <span class="input-label">确认本次读数（m³）</span>
+              <el-input-number
+                v-model="task._confirmReading"
+                :precision="4"
+                :min="Number(task.lastReading)"
+                :step="0.01"
+                size="default"
+                controls-position="right"
+              />
+            </div>
+            <el-button 
+              type="primary" 
+              @click="handleSubmitTask(task)" 
+              :loading="task._submitting"
+              :disabled="!task._confirmReading"
+            >
+              <el-icon><CircleCheck /></el-icon>
+              提交记录
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 搜索区域 -->
     <el-card class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
@@ -146,12 +325,9 @@
         <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
-              <el-button type="primary" link @click="handleEdit(row)">
-                <el-icon><Edit /></el-icon>
-                编辑
-              </el-button>
+              <!-- 管理员：只能确认 -->
               <el-button
-                v-if="row.status === 0"
+                v-if="isAdmin && row.status === 0"
                 type="success"
                 link
                 @click="handleConfirm(row)"
@@ -159,7 +335,12 @@
                 <el-icon><CircleCheck /></el-icon>
                 确认
               </el-button>
-              <el-button type="danger" link @click="handleDelete(row)">
+              <!-- 抄表员：编辑、删除 -->
+              <el-button v-if="isReader" type="primary" link @click="handleEdit(row)">
+                <el-icon><Edit /></el-icon>
+                编辑
+              </el-button>
+              <el-button v-if="isReader" type="danger" link @click="handleDelete(row)">
                 <el-icon><Delete /></el-icon>
                 删除
               </el-button>
@@ -331,10 +512,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { getUsagePage, addUsage, updateUsage, confirmUsage, deleteUsage, getUsageById } from '@/api/waterUsage'
 import { getUserPage } from '@/api/user'
 import { getMeterPage } from '@/api/waterMeter'
+import { getNeedReadMeters, notifyMeterRead, notifyAllMeterRead, getPendingTasks as fetchPendingTasks, completeTask } from '@/api/meterReadTask'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
@@ -344,8 +526,33 @@ import {
   Delete,
   Monitor,
   User,
-  CircleCheck
+  CircleCheck,
+  Bell,
+  EditPen,
+  Clock
 } from '@element-plus/icons-vue'
+
+// 角色判断
+const isAdmin = computed(() => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  return userInfo.userType === 1
+})
+const isReader = computed(() => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  return userInfo.userType === 3
+})
+
+// 需要抄表的水表列表（管理员用）
+const needReadList = ref([])
+const needReadLoading = ref(false)
+
+// 分成两组：未通知的 / 已通知待处理的
+const unnotifiedList = computed(() => needReadList.value.filter(item => !item.hasPendingTask))
+const notifiedList = computed(() => needReadList.value.filter(item => item.hasPendingTask))
+
+// 抄表员待处理任务
+const pendingTasks = ref([])
+const taskLoading = ref(false)
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -613,14 +820,386 @@ const handleCurrentChange = () => {
   loadData()
 }
 
+// ========== 管理员：抄表通知功能 ==========
+const loadNeedReadMeters = async () => {
+  needReadLoading.value = true
+  try {
+    const res = await getNeedReadMeters()
+    if (res.code === 200) {
+      needReadList.value = res.data || []
+    }
+  } catch (error) {
+    console.error('加载需要抄表的水表失败', error)
+  } finally {
+    needReadLoading.value = false
+  }
+}
+
+const handleNotify = async (row) => {
+  ElMessageBox.confirm(
+    `确定要通知抄表员对水表 ${row.meterNo} 进行抄表吗？\n变化量：+${Number(row.diff).toFixed(4)} m³`,
+    '通知抄表',
+    {
+      confirmButtonText: '发送通知',
+      cancelButtonText: '取消',
+      type: 'info'
+    }
+  ).then(async () => {
+    try {
+      const res = await notifyMeterRead([row.meterId])
+      if (res.code === 200) {
+        ElMessage.success('已通知抄表员')
+        loadNeedReadMeters()
+      }
+    } catch (error) {
+      ElMessage.error('通知失败')
+    }
+  }).catch(() => {})
+}
+
+const handleNotifyAll = async () => {
+  const pendingCount = needReadList.value.filter(item => !item.hasPendingTask).length
+  if (pendingCount === 0) {
+    ElMessage.warning('所有水表都已通知')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要通知抄表员对 ${pendingCount} 个水表进行抄表吗？`,
+    '批量通知抄表',
+    {
+      confirmButtonText: '全部通知',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      const res = await notifyAllMeterRead()
+      if (res.code === 200) {
+        ElMessage.success(res.data)
+        loadNeedReadMeters()
+      }
+    } catch (error) {
+      ElMessage.error('通知失败')
+    }
+  }).catch(() => {})
+}
+
+// ========== 抄表员：待处理任务功能 ==========
+const loadPendingTasks = async () => {
+  taskLoading.value = true
+  try {
+    const res = await fetchPendingTasks()
+    if (res.code === 200) {
+      // 给每个任务添加临时字段
+      pendingTasks.value = (res.data || []).map(task => ({
+        ...task,
+        _confirmReading: Number(getMeterInfo(task.meterId)?.currentReading || task.currentReading),
+        _submitting: false
+      }))
+    }
+  } catch (error) {
+    console.error('加载待处理任务失败', error)
+  } finally {
+    taskLoading.value = false
+  }
+}
+
+const handleSubmitTask = async (task) => {
+  if (!task._confirmReading) {
+    ElMessage.warning('请填写本次读数')
+    return
+  }
+
+  if (task._confirmReading <= Number(task.lastReading)) {
+    ElMessage.error('本次读数必须大于上次读数')
+    return
+  }
+
+  task._submitting = true
+  try {
+    // 自动生成抄表日期和月份
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const readMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    
+    // 1. 创建用水记录
+    const usageData = {
+      meterId: task.meterId,
+      userId: task.userId,
+      readMonth: readMonth,
+      readDate: today,
+      lastReading: Number(task.lastReading),
+      currentReading: task._confirmReading,
+      status: 0
+    }
+
+    const res = await addUsage(usageData)
+    if (res.code === 200) {
+      // 2. 完成抄表任务
+      await completeTask(task.taskId, res.data?.usageId || null)
+      
+      ElMessage.success('抄表记录提交成功！')
+      // 刷新任务列表和数据
+      loadPendingTasks()
+      loadData()
+    }
+  } catch (error) {
+    ElMessage.error('提交失败，请重试')
+    console.error(error)
+  } finally {
+    task._submitting = false
+  }
+}
+
 onMounted(() => {
   loadUserList()
   loadMeterList()
   loadData()
+  
+  // 管理员加载需要抄表的水表
+  if (isAdmin.value) {
+    loadNeedReadMeters()
+  }
+  
+  // 抄表员加载待处理任务（需要在 meterList 加载后执行）
+  if (isReader.value) {
+    // 延迟加载，确保 meterList 已加载
+    setTimeout(() => {
+      loadPendingTasks()
+    }, 500)
+  }
 })
 </script>
 
 <style scoped lang="scss">
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+// 抄表员任务面板
+.task-card {
+  margin-bottom: 20px;
+  border: 1px solid #d4edda;
+  background: linear-gradient(135deg, #f0fff4 0%, #e8f8ee 100%);
+  
+  :deep(.el-card__header) {
+    padding: 12px 20px;
+    background: rgba(82, 196, 26, 0.05);
+    border-bottom: 1px solid #d4edda;
+  }
+  
+  .task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .task-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #52c41a;
+      
+      .el-icon {
+        font-size: 18px;
+      }
+    }
+  }
+  
+  .task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    
+    .task-item {
+      background: white;
+      border-radius: 10px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      border: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      transition: box-shadow 0.3s;
+      
+      &:hover {
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+      }
+      
+      .task-info {
+        flex: 1;
+        
+        .task-meter {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+          
+          .el-icon {
+            color: #52c41a;
+          }
+          
+          .meter-no {
+            font-weight: 600;
+            font-size: 15px;
+            color: #303133;
+          }
+          
+          .task-user {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #606266;
+            font-size: 13px;
+            margin-left: 8px;
+          }
+          
+          .task-address {
+            color: #909399;
+            font-size: 12px;
+            margin-left: 8px;
+          }
+        }
+        
+        .task-readings {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          
+          .reading-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            
+            .reading-label {
+              font-size: 12px;
+              color: #909399;
+            }
+            
+            .reading-value {
+              font-size: 16px;
+              font-weight: 600;
+              color: #606266;
+              font-family: 'Courier New', monospace;
+            }
+            
+            &.current .reading-value {
+              color: #1890ff;
+            }
+          }
+          
+          .reading-arrow {
+            color: #c0c4cc;
+            font-size: 18px;
+            margin: 8px 0 0;
+          }
+          
+          .reading-diff {
+            margin: 8px 0 0;
+            color: #f56c6c;
+            font-weight: bold;
+            font-size: 14px;
+            background: rgba(245, 108, 108, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+          }
+        }
+      }
+      
+      .task-action {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-shrink: 0;
+        
+        .task-input-group {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          
+          .input-label {
+            font-size: 12px;
+            color: #909399;
+          }
+          
+          .input-unit {
+            font-size: 12px;
+            color: #909399;
+            align-self: flex-end;
+            margin-bottom: 6px;
+            display: none;
+          }
+        }
+      }
+    }
+  }
+}
+
+// 抄表通知面板
+.notify-card {
+  margin-bottom: 20px;
+  border: 1px solid #ffecd2;
+  background: linear-gradient(135deg, #fff9f0 0%, #fff3e0 100%);
+  
+  :deep(.el-card__header) {
+    padding: 12px 20px;
+    background: rgba(230, 162, 60, 0.05);
+    border-bottom: 1px solid #ffecd2;
+  }
+  
+  .notify-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .notify-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      color: #e6a23c;
+      
+      .el-icon {
+        font-size: 18px;
+      }
+    }
+    
+    .notify-actions {
+      display: flex;
+      gap: 8px;
+    }
+  }
+  
+  .empty-tip {
+    text-align: center;
+    padding: 24px 0;
+    color: #909399;
+    font-size: 14px;
+  }
+  
+  .notified-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed #e0e0e0;
+    
+    .notified-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #909399;
+      margin-bottom: 8px;
+      
+      .el-icon {
+        font-size: 14px;
+      }
+    }
+  }
+}
+
 .page-container {
   animation: fadeIn 0.3s ease;
 }

@@ -11,6 +11,8 @@ import com.waterworks.mapper.WaterMeterMapper;
 import com.waterworks.service.WaterMeterService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * 水表服务实现类
  */
@@ -73,6 +75,14 @@ public class WaterMeterServiceImpl extends ServiceImpl<WaterMeterMapper, WaterMe
         }
 
         return this.updateById(waterMeter);
+    }
+
+    @Override
+    public List<WaterMeter> getMetersByUserId(Long userId) {
+        LambdaQueryWrapper<WaterMeter> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(WaterMeter::getUserId, userId);
+        wrapper.orderByDesc(WaterMeter::getCreateTime);
+        return this.list(wrapper);
     }
 }
 

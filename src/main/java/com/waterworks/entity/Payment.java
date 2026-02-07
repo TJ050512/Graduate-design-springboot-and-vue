@@ -71,6 +71,11 @@ public class Payment extends BaseEntity {
      * 状态(0:待支付 1:已支付 2:已退款)
      */
     private Integer status;
+
+    /**
+     * 是否需要提醒(0:不需要 1:需要)
+     */
+    private Integer needRemind;
 }
 
 

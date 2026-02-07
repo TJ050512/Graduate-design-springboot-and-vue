@@ -250,7 +250,8 @@ import {
   Lightning,
   TrendCharts,
   PieChart,
-  Coin
+  Coin,
+  Tools
 } from '@element-plus/icons-vue'
 import { getUserPage } from '@/api/user'
 import { getMeterPage } from '@/api/waterMeter'
@@ -279,6 +280,7 @@ const userType = computed(() => userStore.userInfo?.userType)
 const isAdmin = computed(() => userType.value === 1)
 const isNormalUser = computed(() => userType.value === 2)
 const isReader = computed(() => userType.value === 3)
+const isRepairman = computed(() => userType.value === 4)  // 维修人员
 
 const userName = computed(() => userStore.userInfo?.realName || userStore.userInfo?.username || '用户')
 
@@ -385,6 +387,32 @@ const loadStatistics = async () => {
       statistics.value = [
         { ...statistics.value[1], label: '水表总数', value: meterRes.data?.total || 0 },
         { ...statistics.value[2], label: '用水记录', value: usageRes.data?.total || 0 }
+      ]
+    } else if (isRepairman.value) {
+      // 维修人员：加载报修工单统计
+      const { getRepairOrderPage } = await import('@/api/repair')
+      const [pendingRes, processingRes] = await Promise.all([
+        getRepairOrderPage({ page: 1, size: 1, status: 0 }),  // 待处理
+        getRepairOrderPage({ page: 1, size: 1, status: 1 })   // 处理中
+      ])
+      
+      statistics.value = [
+        { 
+          icon: markRaw(Document), 
+          label: '待处理工单', 
+          value: pendingRes.data?.total || 0, 
+          unit: '条',
+          gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          decorationColor: 'rgba(240, 147, 251, 0.1)'
+        },
+        { 
+          icon: markRaw(Monitor), 
+          label: '处理中工单', 
+          value: processingRes.data?.total || 0, 
+          unit: '条',
+          gradient: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+          decorationColor: 'rgba(17, 153, 142, 0.1)'
+        }
       ]
     }
     
@@ -589,14 +617,16 @@ const loadUserPieChart = async () => {
         },
         legend: {
           orient: 'vertical',
-          right: 10,
-          top: 'center'
+          right: 0,
+          top: 'center',
+          itemGap: 12,
+          textStyle: { fontSize: 12 }
         },
         series: [
           {
             type: 'pie',
-            radius: ['40%', '70%'],
-            center: ['35%', '50%'],
+            radius: ['35%', '60%'],
+            center: ['30%', '50%'],
             avoidLabelOverlap: false,
             itemStyle: {
               borderRadius: 8,
@@ -604,6 +634,7 @@ const loadUserPieChart = async () => {
               borderWidth: 2
             },
             label: { show: false },
+            labelLine: { show: false },
             emphasis: {
               label: {
                 show: true,
@@ -640,14 +671,16 @@ const loadPaymentPieChart = async () => {
         },
         legend: {
           orient: 'vertical',
-          right: 10,
-          top: 'center'
+          right: 0,
+          top: 'center',
+          itemGap: 12,
+          textStyle: { fontSize: 12 }
         },
         series: [
           {
             type: 'pie',
-            radius: ['40%', '70%'],
-            center: ['35%', '50%'],
+            radius: ['35%', '60%'],
+            center: ['30%', '50%'],
             avoidLabelOverlap: false,
             itemStyle: {
               borderRadius: 8,
@@ -655,6 +688,7 @@ const loadPaymentPieChart = async () => {
               borderWidth: 2
             },
             label: { show: false },
+            labelLine: { show: false },
             emphasis: {
               label: {
                 show: true,
@@ -747,6 +781,13 @@ const quickActions = computed(() => {
       { title: '系统公告', icon: markRaw(Bell), path: '/noticeList', gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }
     ]
   }
+  // 维修人员的快捷操作
+  if (isRepairman.value) {
+    return [
+      { title: '报修工单', icon: markRaw(Tools), path: '/repair', gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+      { title: '系统公告', icon: markRaw(Bell), path: '/noticeList', gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }
+    ]
+  }
   return []
 })
 
@@ -783,6 +824,9 @@ const features = computed(() => {
   }
   if (isReader.value) {
     return ['水表管理', '录入抄表', '查看公告', '个人信息']
+  }
+  if (isRepairman.value) {
+    return ['报修工单', '处理维修', '查看公告', '个人信息']
   }
   return ['用户管理', '水表管理', '用水记录', '缴费管理', '公告管理', '数据统计']
 })

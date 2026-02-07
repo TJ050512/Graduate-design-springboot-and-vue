@@ -80,8 +80,8 @@
           <template #title>我的缴费</template>
         </el-menu-item>
         
-        <!-- 管理员和抄表员可见：报修工单管理 -->
-        <el-menu-item index="/repair" v-if="isAdmin || isReader">
+        <!-- 管理员和维修人员可见：报修工单管理 -->
+        <el-menu-item index="/repair" v-if="isAdmin || isRepairman">
           <el-icon><Tools /></el-icon>
           <template #title>报修工单</template>
         </el-menu-item>
@@ -98,8 +98,8 @@
           <template #title>公告管理</template>
         </el-menu-item>
         
-        <!-- 普通用户和抄表员可见：公告列表 -->
-        <el-menu-item index="/noticeList" v-if="isNormalUser || isReader">
+        <!-- 普通用户、抄表员和维修人员可见：公告列表 -->
+        <el-menu-item index="/noticeList" v-if="isNormalUser || isReader || isRepairman">
           <el-icon><Bell /></el-icon>
           <template #title>系统公告</template>
         </el-menu-item>
@@ -215,9 +215,12 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { getUnpaidReminders } from '@/api/payment'
+import { getPendingTaskCount } from '@/api/meterReadTask'
+import { ElMessageBox } from 'element-plus'
 import {
   HomeFilled,
   User,
@@ -233,6 +236,7 @@ import {
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const isCollapse = ref(false)
 const profileDialogVisible = ref(false)
@@ -245,6 +249,81 @@ const userType = computed(() => userStore.userInfo?.userType)
 const isAdmin = computed(() => userType.value === 1)        // 管理员
 const isNormalUser = computed(() => userType.value === 2)   // 普通用户
 const isReader = computed(() => userType.value === 3)       // 抄表员
+
+// 检查未缴费提醒（仅普通用户）
+const checkUnpaidReminders = async () => {
+  if (!isNormalUser.value) return
+  
+  try {
+    const res = await getUnpaidReminders()
+    if (res.code === 200 && res.data.hasReminder) {
+      const { count, totalAmount } = res.data
+      
+      ElMessageBox.confirm(
+        `<div style="text-align: center;">
+          <div style="font-size: 48px; margin-bottom: 16px;">💧</div>
+          <div style="font-size: 18px; font-weight: bold; margin-bottom: 12px; color: #f56c6c;">您有 ${count} 笔水费待缴纳</div>
+          <div style="font-size: 24px; font-weight: bold; color: #f56c6c; margin-bottom: 16px;">¥${totalAmount}</div>
+          <div style="color: #909399; font-size: 14px;">为避免影响您的正常用水，请尽快完成缴费</div>
+        </div>`,
+        '缴费提醒',
+        {
+          confirmButtonText: '立即缴费',
+          cancelButtonText: '稍后处理',
+          dangerouslyUseHTMLString: true,
+          type: 'warning',
+          center: true
+        }
+      ).then(() => {
+        router.push('/myPayment')
+      }).catch(() => {})
+    }
+  } catch (error) {
+    console.error('获取未缴费提醒失败', error)
+  }
+}
+
+// 检查抄表任务提醒（仅抄表员）
+const checkMeterReadTasks = async () => {
+  if (!isReader.value) return
+  
+  try {
+    const res = await getPendingTaskCount()
+    if (res.code === 200 && res.data > 0) {
+      const count = res.data
+      
+      ElMessageBox.confirm(
+        `<div style="text-align: center;">
+          <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+          <div style="font-size: 18px; font-weight: bold; margin-bottom: 12px; color: #e6a23c;">您有 ${count} 个抄表任务待处理</div>
+          <div style="color: #909399; font-size: 14px;">管理员已通知您对相关水表进行抄表，请及时处理</div>
+        </div>`,
+        '抄表任务提醒',
+        {
+          confirmButtonText: '查看任务',
+          cancelButtonText: '稍后处理',
+          dangerouslyUseHTMLString: true,
+          type: 'warning',
+          center: true
+        }
+      ).then(() => {
+        router.push('/waterUsage')
+      }).catch(() => {})
+    }
+  } catch (error) {
+    console.error('获取抄表任务提醒失败', error)
+  }
+}
+
+// 页面加载时检查提醒
+onMounted(() => {
+  // 延迟1秒检查，避免页面刚加载就弹窗
+  setTimeout(() => {
+    checkUnpaidReminders()
+    checkMeterReadTasks()
+  }, 1000)
+})
+const isRepairman = computed(() => userType.value === 4)    // 维修人员
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
@@ -264,6 +343,7 @@ const getUserRoleText = () => {
     case 1: return '管理员'
     case 2: return '普通用户'
     case 3: return '抄表员'
+    case 4: return '维修人员'
     default: return '用户'
   }
 }
@@ -274,6 +354,7 @@ const getUserTypeTag = () => {
     case 1: return 'danger'
     case 2: return 'success'
     case 3: return 'warning'
+    case 4: return 'primary'
     default: return 'info'
   }
 }

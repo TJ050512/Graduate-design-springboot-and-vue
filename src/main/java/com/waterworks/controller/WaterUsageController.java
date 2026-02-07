@@ -1,5 +1,6 @@
 package com.waterworks.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
@@ -12,6 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 用水记录控制器
@@ -80,6 +85,43 @@ public class WaterUsageController {
     public Result<Boolean> deleteUsage(@PathVariable Long id) {
         boolean result = waterUsageService.removeById(id);
         return Result.success(result);
+    }
+
+    @Operation(summary = "获取用户用水统计")
+    @GetMapping("/statistics")
+    public Result<Map<String, Object>> getUserStatistics(@RequestParam Long userId) {
+        Map<String, Object> stats = new HashMap<>();
+        
+        // 查询该用户所有用水记录
+        LambdaQueryWrapper<WaterUsage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(WaterUsage::getUserId, userId);
+        List<WaterUsage> usageList = waterUsageService.list(wrapper);
+        
+        // 计算总用水量
+        BigDecimal totalUsage = usageList.stream()
+                .map(WaterUsage::getUsage)
+                .filter(u -> u != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // 计算总费用
+        BigDecimal totalAmount = usageList.stream()
+                .map(WaterUsage::getAmount)
+                .filter(a -> a != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // 计算待缴费用（状态不是"已缴费"的）
+        BigDecimal unpaidAmount = usageList.stream()
+                .filter(u -> u.getStatus() == null || u.getStatus() != 2)
+                .map(WaterUsage::getAmount)
+                .filter(a -> a != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        stats.put("totalUsage", totalUsage);
+        stats.put("totalAmount", totalAmount);
+        stats.put("unpaidAmount", unpaidAmount);
+        stats.put("recordCount", usageList.size());
+        
+        return Result.success(stats);
     }
 }
 

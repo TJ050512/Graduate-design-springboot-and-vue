@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.waterworks.entity.WaterMeter;
 
+import java.util.List;
+
 /**
  * 水表服务接口
  */
@@ -45,6 +47,14 @@ public interface WaterMeterService extends IService<WaterMeter> {
      * @return 是否成功
      */
     boolean updateMeter(WaterMeter waterMeter);
+
+    /**
+     * 根据用户ID查询水表列表
+     *
+     * @param userId 用户ID
+     * @return 水表列表
+     */
+    List<WaterMeter> getMetersByUserId(Long userId);
 }
 
 

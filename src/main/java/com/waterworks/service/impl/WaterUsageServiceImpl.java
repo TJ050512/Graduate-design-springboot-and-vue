@@ -5,9 +5,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.waterworks.common.ResultCode;
+import com.waterworks.entity.Payment;
 import com.waterworks.entity.WaterMeter;
 import com.waterworks.entity.WaterUsage;
 import com.waterworks.exception.BusinessException;
+import com.waterworks.mapper.PaymentMapper;
 import com.waterworks.mapper.WaterUsageMapper;
 import com.waterworks.service.WaterMeterService;
 import com.waterworks.service.WaterPriceService;
@@ -33,6 +35,9 @@ public class WaterUsageServiceImpl extends ServiceImpl<WaterUsageMapper, WaterUs
 
     @Autowired
     private WaterPriceService waterPriceService;
+
+    @Autowired
+    private PaymentMapper paymentMapper;
 
     @Override
     public Page<WaterUsage> getUsagePage(Integer page, Integer size, Long userId, Long meterId, String readMonth, Integer status) {
@@ -65,6 +70,11 @@ public class WaterUsageServiceImpl extends ServiceImpl<WaterUsageMapper, WaterUs
             throw new BusinessException("水表不存在");
         }
 
+        // 【改进】如果没有提供当前读数，自动使用水表的当前读数（由模拟器自动更新）
+        if (waterUsage.getCurrentReading() == null) {
+            waterUsage.setCurrentReading(waterMeter.getCurrentReading());
+        }
+
         // 计算用水量
         BigDecimal usage = waterUsage.getCurrentReading().subtract(waterUsage.getLastReading());
         if (usage.compareTo(BigDecimal.ZERO) < 0) {
@@ -83,16 +93,8 @@ public class WaterUsageServiceImpl extends ServiceImpl<WaterUsageMapper, WaterUs
         log.info("用水记录计费 - 水表: {}, 类型: {}, 用水量: {}m³, 应缴金额: {}元", 
                 waterMeter.getMeterNo(), getMeterTypeName(waterMeter.getMeterType()), usage, amount);
 
-        // 保存记录
-        boolean result = this.save(waterUsage);
-
-        // 更新水表当前读数
-        if (result) {
-            waterMeter.setCurrentReading(waterUsage.getCurrentReading());
-            waterMeterService.updateById(waterMeter);
-        }
-
-        return result;
+        // 保存记录（不再更新水表读数，读数由模拟器自动管理）
+        return this.save(waterUsage);
     }
 
     /**
@@ -139,27 +141,62 @@ public class WaterUsageServiceImpl extends ServiceImpl<WaterUsageMapper, WaterUs
         log.info("用水记录更新计费 - 水表: {}, 类型: {}, 用水量: {}m³, 应缴金额: {}元", 
                 waterMeter.getMeterNo(), getMeterTypeName(waterMeter.getMeterType()), usage, amount);
 
-        // 更新记录
+        // 更新记录（不再更新水表读数，读数由模拟器自动管理）
         boolean result = this.updateById(waterUsage);
 
-        // 更新水表当前读数
+        // 同步更新关联的待支付缴费记录金额
         if (result) {
-            waterMeter.setCurrentReading(waterUsage.getCurrentReading());
-            waterMeterService.updateById(waterMeter);
+            LambdaQueryWrapper<Payment> paymentWrapper = new LambdaQueryWrapper<>();
+            paymentWrapper.eq(Payment::getUsageId, waterUsage.getUsageId());
+            paymentWrapper.eq(Payment::getStatus, 0); // 只更新待支付的记录
+            Payment payment = paymentMapper.selectOne(paymentWrapper);
+            if (payment != null) {
+                payment.setAmount(amount);
+                paymentMapper.updateById(payment);
+                log.info("同步更新缴费记录金额 - 缴费单号: {}, 新金额: {}元", payment.getPaymentNo(), amount);
+            }
         }
 
         return result;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean confirmUsage(Long usageId) {
         WaterUsage waterUsage = this.getById(usageId);
         if (waterUsage == null) {
             throw new BusinessException(ResultCode.DATA_NOT_EXIST);
         }
 
+        // 更新用水记录状态为已确认
         waterUsage.setStatus(1);
-        return this.updateById(waterUsage);
+        boolean result = this.updateById(waterUsage);
+
+        // 自动创建缴费单
+        if (result) {
+            // 检查是否已存在缴费单
+            LambdaQueryWrapper<Payment> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(Payment::getUsageId, usageId);
+            wrapper.ne(Payment::getStatus, 2); // 排除已退款的
+            Payment existPayment = paymentMapper.selectOne(wrapper);
+            
+            if (existPayment == null) {
+                // 创建新的缴费单
+                Payment payment = new Payment();
+                payment.setUsageId(usageId);
+                payment.setUserId(waterUsage.getUserId());
+                payment.setMeterId(waterUsage.getMeterId());
+                payment.setAmount(waterUsage.getAmount());
+                payment.setPaymentNo("PAY" + cn.hutool.core.util.IdUtil.getSnowflakeNextIdStr());
+                payment.setPaymentMethod(2); // 默认微信支付
+                payment.setStatus(0); // 待支付
+                paymentMapper.insert(payment);
+                log.info("自动创建缴费单 - 用水记录ID: {}, 缴费单号: {}, 金额: {}元", 
+                        usageId, payment.getPaymentNo(), payment.getAmount());
+            }
+        }
+
+        return result;
     }
 }
 

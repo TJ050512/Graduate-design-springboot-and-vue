@@ -122,33 +122,45 @@
             <span v-else class="text-secondary">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        <el-table-column label="操作" width="220" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button type="primary" link @click="handleView(row)">
                 <el-icon><View /></el-icon>
                 详情
               </el-button>
+              <!-- 维修人员：接单（仅待处理且无人接单时） -->
               <el-button
-                v-if="row.status === 0"
+                v-if="isRepairman && row.status === 0"
                 type="success"
                 link
                 @click="handleStart(row)"
               >
                 <el-icon><VideoPlay /></el-icon>
-                处理
+                接单
               </el-button>
+              <!-- 维修人员：处理（仅自己接的单） -->
               <el-button
-                v-if="row.status === 1"
+                v-if="isRepairman && row.status === 1 && row.handlerId === currentUserId"
                 type="warning"
                 link
                 @click="handleComplete(row)"
               >
                 <el-icon><CircleCheck /></el-icon>
-                完成
+                处理
               </el-button>
+              <!-- 维修人员：别人接的单显示提示 -->
+              <el-tag 
+                v-if="isRepairman && row.status === 1 && row.handlerId !== currentUserId" 
+                type="info" 
+                size="small" 
+                effect="light"
+              >
+                他人处理中
+              </el-tag>
+              <!-- 管理员：取消 -->
               <el-button
-                v-if="row.status === 0 || row.status === 1"
+                v-if="isAdmin && (row.status === 0 || row.status === 1)"
                 type="danger"
                 link
                 @click="handleCancel(row)"
@@ -249,30 +261,64 @@
     <!-- 完成工单对话框 -->
     <el-dialog
       v-model="completeDialogVisible"
-      title="完成工单"
-      width="500px"
+      title="处理工单"
+      width="520px"
     >
       <el-form :model="completeForm" label-width="100px">
         <el-form-item label="处理结果" required>
+          <el-radio-group v-model="completeForm.isSuccess" class="result-radio-group">
+            <el-radio-button :value="true">
+              <el-icon><CircleCheck /></el-icon>
+              处理成功
+            </el-radio-button>
+            <el-radio-button :value="false">
+              <el-icon><CircleClose /></el-icon>
+              处理失败
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        
+        <!-- 处理成功时显示 -->
+        <el-form-item v-if="completeForm.isSuccess" label="处理说明" required>
           <el-input
             v-model="completeForm.handleResult"
             type="textarea"
             :rows="4"
-            placeholder="请输入处理结果..."
+            placeholder="请输入处理过程和结果..."
           />
+        </el-form-item>
+        
+        <!-- 处理失败时显示 -->
+        <el-form-item v-else label="失败原因" required>
+          <el-input
+            v-model="completeForm.failReason"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入无法处理的原因（如：需要特殊配件、用户不在家等）..."
+          />
+          <div class="form-tip">
+            <el-icon><Warning /></el-icon>
+            工单将回到待处理状态，等待其他维修人员处理
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="completeDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleCompleteSubmit" :loading="submitLoading">确认完成</el-button>
+        <el-button 
+          :type="completeForm.isSuccess ? 'success' : 'warning'" 
+          @click="handleCompleteSubmit" 
+          :loading="submitLoading"
+        >
+          {{ completeForm.isSuccess ? '确认完成' : '确认转派' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { getRepairOrderPage, getRepairOrderById, handleOrder, completeOrder, cancelOrder } from '@/api/repair'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { getRepairOrderPage, getRepairOrderById, handleOrder, completeOrder, failOrder, cancelOrder } from '@/api/repair'
 import { getUserPage } from '@/api/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -281,8 +327,15 @@ import {
   View,
   VideoPlay,
   CircleCheck,
-  CircleClose
+  CircleClose,
+  Warning
 } from '@element-plus/icons-vue'
+
+// 角色判断
+const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+const currentUserId = userInfo.userId
+const isAdmin = computed(() => userInfo.userType === 1)
+const isRepairman = computed(() => userInfo.userType === 4)
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -328,7 +381,9 @@ const currentOrder = reactive({
 
 const completeForm = reactive({
   orderId: null,
-  handleResult: ''
+  isSuccess: true,  // 是否处理成功
+  handleResult: '', // 成功时的处理结果
+  failReason: ''    // 失败时的失败原因
 })
 
 const getRepairTypeName = (type) => {
@@ -446,21 +501,43 @@ const handleStart = async (row) => {
 
 const handleComplete = (row) => {
   completeForm.orderId = row.orderId
+  completeForm.isSuccess = true
   completeForm.handleResult = ''
+  completeForm.failReason = ''
   completeDialogVisible.value = true
 }
 
 const handleCompleteSubmit = async () => {
-  if (!completeForm.handleResult.trim()) {
-    ElMessage.warning('请输入处理结果')
-    return
+  // 根据成功/失败进行不同的验证
+  if (completeForm.isSuccess) {
+    if (!completeForm.handleResult.trim()) {
+      ElMessage.warning('请输入处理结果')
+      return
+    }
+  } else {
+    if (!completeForm.failReason.trim()) {
+      ElMessage.warning('请输入失败原因')
+      return
+    }
   }
   
   submitLoading.value = true
   try {
-    const res = await completeOrder(completeForm.orderId, completeForm.handleResult)
+    let res
+    if (completeForm.isSuccess) {
+      // 处理成功，完成工单
+      res = await completeOrder(completeForm.orderId, completeForm.handleResult)
+      if (res.code === 200) {
+        ElMessage.success('工单已完成')
+      }
+    } else {
+      // 处理失败，转派工单
+      res = await failOrder(completeForm.orderId, completeForm.failReason)
+      if (res.code === 200) {
+        ElMessage.success('工单已转派，等待其他维修人员处理')
+      }
+    }
     if (res.code === 200) {
-      ElMessage.success('工单已完成')
       completeDialogVisible.value = false
       loadData()
     }
@@ -645,6 +722,41 @@ onMounted(() => {
   
   .search-form {
     flex-direction: column;
+  }
+}
+
+// 处理结果单选按钮组
+.result-radio-group {
+  :deep(.el-radio-button__inner) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+  }
+  
+  :deep(.el-radio-button:first-child .el-radio-button__inner) {
+    border-radius: 8px 0 0 8px;
+  }
+  
+  :deep(.el-radio-button:last-child .el-radio-button__inner) {
+    border-radius: 0 8px 8px 0;
+  }
+}
+
+// 表单提示
+.form-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fef0f0;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #f56c6c;
+  
+  .el-icon {
+    font-size: 14px;
   }
 }
 </style>

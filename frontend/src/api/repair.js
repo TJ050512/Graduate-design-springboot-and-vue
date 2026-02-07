@@ -60,6 +60,15 @@ export function completeOrder(id, handleResult) {
   })
 }
 
+// 处理失败，转派工单
+export function failOrder(id, failReason) {
+  return request({
+    url: `/repair/fail/${id}`,
+    method: 'put',
+    data: { failReason }
+  })
+}
+
 // 取消工单
 export function cancelOrder(id) {
   return request({

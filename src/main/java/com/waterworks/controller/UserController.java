@@ -58,7 +58,7 @@ public class UserController {
 
     @Operation(summary = "分页查询用户列表")
     @GetMapping("/page")
-    @RequireRole(roles = {1, 3}, description = "管理员和抄表员可查询用户列表")
+    @RequireRole(roles = {1, 3, 4}, description = "管理员、抄表员和维修人员可查询用户列表")
     public Result<PageResult<User>> getUserPage(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,

@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.waterworks.entity.Payment;
 
+import java.util.List;
+
 /**
  * 缴费记录服务接口
  */
@@ -33,10 +35,27 @@ public interface PaymentService extends IService<Payment> {
     /**
      * 支付
      *
+     * @param paymentId     缴费ID
+     * @param paymentMethod 支付方式（可选，传入则更新）
+     * @return 是否成功
+     */
+    boolean pay(Long paymentId, Integer paymentMethod);
+
+    /**
+     * 发送催缴提醒
+     *
      * @param paymentId 缴费ID
      * @return 是否成功
      */
-    boolean pay(Long paymentId);
+    boolean sendReminder(Long paymentId);
+
+    /**
+     * 批量发送催缴提醒
+     *
+     * @param paymentIds 缴费ID列表
+     * @return 是否成功
+     */
+    boolean batchSendReminder(List<Long> paymentIds);
 }
 
 

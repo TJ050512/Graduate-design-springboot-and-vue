@@ -203,7 +203,7 @@ npm run dev
 
 ### 6. 访问系统
 
-- 前端地址：http://localhost:5173
+- 前端地址：http://localhost:3000
 - 后端接口：http://localhost:8080/api
 - API 文档：http://localhost:8080/api/doc.html
 
@@ -286,7 +286,7 @@ npm run dev
 
 1. 首次启动前需要执行 `sql/init.sql` 初始化数据库
 2. 如果是从旧版本升级，需要执行 `sql/upgrade_v2.sql`
-3. 前端开发服务器默认端口 5173，后端默认端口 8080
+3. 前端开发服务器端口 3000，后端默认端口 8080
 4. 生产环境部署建议修改 JWT 密钥和数据库密码
 
 ## 许可证
@@ -295,4 +295,4 @@ npm run dev
 
 ---
 
-**毕业设计** | Spring Boot 3 + Vue 3 | 2024
+**毕业设计** | Spring Boot 3 + Vue 3 | 2026

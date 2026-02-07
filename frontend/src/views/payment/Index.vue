@@ -6,10 +6,12 @@
         <h2>缴费管理</h2>
         <p>管理用户的缴费记录，处理水费支付业务</p>
       </div>
-      <el-button type="primary" @click="handleCreate">
-        <el-icon><Plus /></el-icon>
-        创建缴费单
-      </el-button>
+      <div class="header-actions">
+        <el-button type="warning" @click="handleBatchRemind" :disabled="unpaidCount === 0">
+          <el-icon><Bell /></el-icon>
+          批量催缴提醒 ({{ unpaidCount }})
+        </el-button>
+      </div>
     </div>
     
     <!-- 搜索区域 -->
@@ -133,17 +135,17 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" align="center" fixed="right">
+        <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button
                 v-if="row.status === 0"
-                type="success"
+                type="warning"
                 link
-                @click="handlePay(row)"
+                @click="handleRemind(row)"
               >
-                <el-icon><CreditCard /></el-icon>
-                支付
+                <el-icon><Bell /></el-icon>
+                催缴
               </el-button>
               <el-button type="primary" link @click="handleView(row)">
                 <el-icon><View /></el-icon>
@@ -243,40 +245,6 @@
       </template>
     </el-dialog>
     
-    <!-- 支付确认对话框 -->
-    <el-dialog
-      v-model="payDialogVisible"
-      title="确认支付"
-      width="500px"
-    >
-      <div class="pay-confirm-card">
-        <div class="pay-amount">
-          <span class="label">支付金额</span>
-          <span class="value">¥{{ currentPayment.amount?.toFixed(2) }}</span>
-        </div>
-        <el-descriptions :column="1" border size="small">
-          <el-descriptions-item label="缴费单号">{{ currentPayment.paymentNo }}</el-descriptions-item>
-          <el-descriptions-item label="用户">
-            {{ getUserInfo(currentPayment.userId)?.realName || '' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="支付方式">
-            <el-tag :type="getPaymentMethodType(currentPayment.paymentMethod)" effect="light">
-              {{ getPaymentMethodName(currentPayment.paymentMethod) }}
-            </el-tag>
-          </el-descriptions-item>
-        </el-descriptions>
-      </div>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="payDialogVisible = false">取消</el-button>
-          <el-button type="success" @click="handlePayConfirm" :loading="payLoading">
-            <el-icon><CreditCard /></el-icon>
-            确认支付
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-    
     <!-- 详情对话框 -->
     <el-dialog
       v-model="detailDialogVisible"
@@ -318,8 +286,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, markRaw } from 'vue'
-import { getPaymentPage, createPayment, pay, getPaymentById } from '@/api/payment'
+import { ref, reactive, onMounted, computed, markRaw } from 'vue'
+import { getPaymentPage, createPayment, getPaymentById, sendReminder, batchSendReminder } from '@/api/payment'
 import { getUsagePage } from '@/api/waterUsage'
 import { getUserPage } from '@/api/user'
 import { getMeterPage } from '@/api/waterMeter'
@@ -333,15 +301,19 @@ import {
   CreditCard,
   Coin,
   ChatDotRound,
-  Wallet
+  Wallet,
+  Bell
 } from '@element-plus/icons-vue'
+
+// 计算待缴费数量
+const unpaidCount = computed(() => {
+  return tableData.value.filter(item => item.status === 0).length
+})
 
 const loading = ref(false)
 const submitLoading = ref(false)
-const payLoading = ref(false)
 const tableData = ref([])
 const createDialogVisible = ref(false)
-const payDialogVisible = ref(false)
 const detailDialogVisible = ref(false)
 const createFormRef = ref(null)
 const userList = ref([])
@@ -540,27 +512,6 @@ const handleCreateDialogClose = () => {
   createFormRef.value?.resetFields()
 }
 
-const handlePay = (row) => {
-  Object.assign(currentPayment, { ...row })
-  payDialogVisible.value = true
-}
-
-const handlePayConfirm = async () => {
-  payLoading.value = true
-  try {
-    const res = await pay(currentPayment.paymentId)
-    if (res.code === 200) {
-      ElMessage.success('支付成功')
-      payDialogVisible.value = false
-      loadData()
-    }
-  } catch (error) {
-    console.error(error)
-  } finally {
-    payLoading.value = false
-  }
-}
-
 const handleView = async (row) => {
   try {
     const res = await getPaymentById(row.paymentId)
@@ -571,6 +522,60 @@ const handleView = async (row) => {
   } catch (error) {
     console.error(error)
   }
+}
+
+// 发送单个催缴提醒
+const handleRemind = async (row) => {
+  const userInfo = getUserInfo(row.userId)
+  const userName = userInfo?.realName || '用户'
+  
+  ElMessageBox.confirm(
+    `确定要向 ${userName} 发送缴费提醒吗？欠费金额：¥${row.amount}`,
+    '发送催缴提醒',
+    {
+      confirmButtonText: '发送提醒',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      const res = await sendReminder(row.paymentId)
+      if (res.code === 200) {
+        ElMessage.success(`已向 ${userName} 发送缴费提醒`)
+      }
+    } catch (error) {
+      ElMessage.error('发送失败')
+    }
+  }).catch(() => {})
+}
+
+// 批量发送催缴提醒
+const handleBatchRemind = async () => {
+  const unpaidList = tableData.value.filter(item => item.status === 0)
+  if (unpaidList.length === 0) {
+    ElMessage.warning('没有待缴费的记录')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要向所有未缴费用户发送催缴提醒吗？共 ${unpaidList.length} 条待缴费记录`,
+    '批量催缴提醒',
+    {
+      confirmButtonText: '全部发送',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      const paymentIds = unpaidList.map(item => item.paymentId)
+      const res = await batchSendReminder(paymentIds)
+      if (res.code === 200) {
+        ElMessage.success(`已向 ${unpaidList.length} 位用户发送缴费提醒`)
+      }
+    } catch (error) {
+      ElMessage.error('发送失败')
+    }
+  }).catch(() => {})
 }
 
 const handleSizeChange = () => {
@@ -775,30 +780,6 @@ onMounted(() => {
     color: #f56c6c;
     font-weight: 600;
     font-size: 16px;
-  }
-}
-
-// 支付确认卡片
-.pay-confirm-card {
-  .pay-amount {
-    text-align: center;
-    padding: 24px;
-    background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
-    border-radius: 12px;
-    margin-bottom: 20px;
-    
-    .label {
-      display: block;
-      color: var(--text-secondary);
-      font-size: 14px;
-      margin-bottom: 8px;
-    }
-    
-    .value {
-      font-size: 36px;
-      font-weight: 700;
-      color: #f56c6c;
-    }
   }
 }
 

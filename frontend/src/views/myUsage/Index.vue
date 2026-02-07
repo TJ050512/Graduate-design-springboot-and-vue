@@ -128,9 +128,24 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="120" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.status === 1"
+              type="primary"
+              size="small"
+              @click="goToPayment"
+            >
+              <el-icon><Wallet /></el-icon>
+              去缴费
+            </el-button>
+            <span v-else-if="row.status === 2" class="paid-text">已缴费</span>
+            <span v-else class="wait-text">等待确认</span>
+          </template>
+        </el-table-column>
       </el-table>
-      
-      <!-- 分页 -->
+    
+    <!-- 分页 -->
       <div class="pagination-container">
         <el-pagination
           v-model:current-page="pagination.current"
@@ -148,18 +163,21 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { getUsagePage } from '@/api/waterUsage'
+import { ref, reactive, onMounted } from 'vue'
+import { getUsagePage, getUsageStatistics } from '@/api/waterUsage'
 import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
 import {
   Search,
   Refresh,
   Document,
   Money,
-  Warning
+  Warning,
+  Wallet
 } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
+const router = useRouter()
 const loading = ref(false)
 const tableData = ref([])
 
@@ -174,20 +192,24 @@ const pagination = reactive({
   total: 0
 })
 
-// 统计数据
-const totalUsage = computed(() => {
-  return tableData.value.reduce((sum, item) => sum + (item.usage || 0), 0)
-})
+// 统计数据（从后端获取）
+const totalUsage = ref(0)
+const totalAmount = ref(0)
+const unpaidAmount = ref(0)
 
-const totalAmount = computed(() => {
-  return tableData.value.reduce((sum, item) => sum + (item.amount || 0), 0)
-})
-
-const unpaidAmount = computed(() => {
-  return tableData.value
-    .filter(item => item.status !== 2)
-    .reduce((sum, item) => sum + (item.amount || 0), 0)
-})
+// 加载统计数据
+const loadStatistics = async () => {
+  try {
+    const res = await getUsageStatistics(userStore.userInfo?.userId)
+    if (res.code === 200 && res.data) {
+      totalUsage.value = res.data.totalUsage || 0
+      totalAmount.value = res.data.totalAmount || 0
+      unpaidAmount.value = res.data.unpaidAmount || 0
+    }
+  } catch (error) {
+    console.error('加载统计数据失败', error)
+  }
+}
 
 const getStatusName = (status) => {
   const names = { 0: '待确认', 1: '待缴费', 2: '已缴费' }
@@ -238,8 +260,14 @@ const handleCurrentChange = () => {
   loadData()
 }
 
+// 跳转到缴费页面
+const goToPayment = () => {
+  router.push('/myPayment')
+}
+
 onMounted(() => {
   loadData()
+  loadStatistics()
 })
 </script>
 
@@ -322,6 +350,8 @@ onMounted(() => {
 .current-reading { color: var(--primary-color); font-weight: 500; }
 .usage-value { font-weight: 600; color: #11998e; }
 .amount-value { font-weight: 600; color: #f56c6c; }
+.paid-text { color: #67c23a; font-size: 13px; }
+.wait-text { color: #909399; font-size: 13px; }
 
 .pagination-container {
   display: flex;

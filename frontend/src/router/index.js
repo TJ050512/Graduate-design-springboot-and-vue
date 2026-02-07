@@ -47,7 +47,7 @@ const routes = [
         path: 'repair',
         name: 'Repair',
         component: () => import('@/views/repair/Index.vue'),
-        meta: { title: '报修工单', icon: 'Tools', roles: [1, 3] }
+        meta: { title: '报修工单', icon: 'Tools', roles: [1, 4] }
       },
       // ========== 管理员 + 抄表员 ==========
       {
@@ -81,12 +81,12 @@ const routes = [
         component: () => import('@/views/myRepair/Index.vue'),
         meta: { title: '我的报修', icon: 'Tools', roles: [2] }
       },
-      // ========== 普通用户 + 抄表员 ==========
+      // ========== 普通用户 + 抄表员 + 维修人员 ==========
       {
         path: 'noticeList',
         name: 'NoticeList',
         component: () => import('@/views/noticeList/Index.vue'),
-        meta: { title: '系统公告', icon: 'Bell', roles: [2, 3] }
+        meta: { title: '系统公告', icon: 'Bell', roles: [2, 3, 4] }
       }
     ]
   }
