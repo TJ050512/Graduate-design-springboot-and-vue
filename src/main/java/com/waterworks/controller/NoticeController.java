@@ -1,6 +1,7 @@
 package com.waterworks.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
 import com.waterworks.common.Result;
 import com.waterworks.entity.Notice;
@@ -50,6 +51,7 @@ public class NoticeController {
 
     @Operation(summary = "添加公告")
     @PostMapping
+    @RequireRole(roles = {1}, description = "仅管理员可添加公告")
     public Result<Boolean> addNotice(@Valid @RequestBody Notice notice) {
         boolean result = noticeService.save(notice);
         return Result.success(result);
@@ -57,6 +59,7 @@ public class NoticeController {
 
     @Operation(summary = "更新公告")
     @PutMapping
+    @RequireRole(roles = {1}, description = "仅管理员可更新公告")
     public Result<Boolean> updateNotice(@Valid @RequestBody Notice notice) {
         boolean result = noticeService.updateById(notice);
         return Result.success(result);
@@ -64,6 +67,7 @@ public class NoticeController {
 
     @Operation(summary = "发布公告")
     @PutMapping("/publish/{id}")
+    @RequireRole(roles = {1}, description = "仅管理员可发布公告")
     public Result<Boolean> publishNotice(@PathVariable Long id) {
         boolean result = noticeService.publishNotice(id);
         return Result.success(result);
@@ -71,6 +75,7 @@ public class NoticeController {
 
     @Operation(summary = "删除公告")
     @DeleteMapping("/{id}")
+    @RequireRole(roles = {1}, description = "仅管理员可删除公告")
     public Result<Boolean> deleteNotice(@PathVariable Long id) {
         boolean result = noticeService.removeById(id);
         return Result.success(result);
