@@ -475,3 +475,5 @@ npm run dev
 ---
 
 **毕业设计** | Spring Boot 3 + Vue 3 | Java 21 | 2026
+
+**作者** | 马骁骁
