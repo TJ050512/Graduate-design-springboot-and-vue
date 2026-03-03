@@ -23,7 +23,7 @@
 | Java | 21 | JDK 版本 |
 | MyBatis-Plus | 3.5.16 | ORM 框架 |
 | MySQL | 8.0 | 关系型数据库 |
-| Redis | - | 缓存 |
+| Redis | - | 已集成配置，预留缓存扩展 |
 | JWT (jjwt) | 0.12.6 | 身份认证 |
 | SpringDoc OpenAPI | 2.8.6 | API 文档 |
 | Lombok | - | 简化代码 |
@@ -39,6 +39,7 @@
 | Pinia | 2.x | 状态管理 |
 | Vue Router | 4.x | 路由管理 |
 | Axios | - | HTTP 请求 |
+| Vite | 5.x | 构建工具 |
 | ECharts | 5.x | 数据可视化 |
 | Sass | - | CSS 预处理器 |
 
@@ -220,7 +221,7 @@ graduate-design-springboot-and-vue/
 - **JDK 21+**
 - **Maven 3.6+**
 - **MySQL 8.0+**
-- **Redis**（可选，用于缓存）
+- **Redis**（可选，已集成配置但当前业务未使用）
 - **Node.js 16+**
 - **npm 8+**
 
@@ -229,8 +230,8 @@ graduate-design-springboot-and-vue/
 ### 1. 克隆项目
 
 ```bash
-git clone https://github.com/your-repo/graduate-design-springboot-and-vue.git
-cd graduate-design-springboot-and-vue
+git clone https://github.com/TJ050512/Graduate-design-springboot-and-vue.git
+cd Graduate-design-springboot-and-vue
 ```
 
 ### 2. 数据库配置
@@ -305,6 +306,8 @@ npm run dev
 | GET | /api/user/page | 分页查询用户 | 管理员/抄表员 |
 | POST | /api/user | 添加用户 | 管理员 |
 | PUT | /api/user | 更新用户 | 管理员 |
+| PUT | /api/user/changePassword | 修改密码 | 登录用户 |
+| PUT | /api/user/resetPassword/{id} | 重置密码 | 管理员 |
 | DELETE | /api/user/{id} | 删除用户 | 管理员 |
 
 ### 水表相关
