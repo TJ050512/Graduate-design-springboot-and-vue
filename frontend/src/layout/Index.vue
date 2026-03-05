@@ -173,7 +173,7 @@
       
       <!-- 底部信息 -->
       <el-footer class="footer">
-        <span>© 2024 水务管理系统 - Water Management System</span>
+        <span>© 2026 水务管理系统 - Water Management System</span>
       </el-footer>
     </el-container>
     

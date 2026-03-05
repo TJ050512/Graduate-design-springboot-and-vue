@@ -116,7 +116,7 @@
     
     <!-- 版权信息 -->
     <div class="copyright">
-      <p>© 2024 水务管理系统 All Rights Reserved</p>
+      <p>© 2026 水务管理系统 All Rights Reserved</p>
     </div>
   </div>
 </template>
