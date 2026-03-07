@@ -667,17 +667,14 @@ onMounted(() => {
     
     &.info {
       background-color: #909399;
-      box-shadow: 0 0 0 3px rgba(144, 147, 153, 0.2);
     }
     
     &.success {
       background-color: #52c41a;
-      box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2);
     }
     
     &.warning {
       background-color: #e6a23c;
-      box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.2);
     }
   }
 }

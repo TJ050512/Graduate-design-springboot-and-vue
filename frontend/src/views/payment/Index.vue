@@ -729,17 +729,14 @@ onMounted(() => {
     
     &.warning {
       background-color: #e6a23c;
-      box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.2);
     }
     
     &.success {
       background-color: #52c41a;
-      box-shadow: 0 0 0 3px rgba(82, 196, 26, 0.2);
     }
     
     &.danger {
       background-color: #ff4d4f;
-      box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.2);
     }
   }
 }
