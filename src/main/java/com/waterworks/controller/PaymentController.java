@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
 import com.waterworks.common.Result;
+import com.waterworks.common.ResultCode;
 import com.waterworks.entity.Payment;
+import com.waterworks.exception.BusinessException;
 import com.waterworks.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,7 +41,12 @@ public class PaymentController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String paymentNo,
             @RequestParam(required = false) Integer paymentMethod,
-            @RequestParam(required = false) Integer status) {
+            @RequestParam(required = false) Integer status,
+            HttpServletRequest request) {
+        Integer currentUserType = getCurrentUserType(request);
+        if (currentUserType == 2) {
+            userId = getCurrentUserId(request);
+        }
         Page<Payment> paymentPage = paymentService.getPaymentPage(page, size, userId, paymentNo, paymentMethod, status);
         PageResult<Payment> pageResult = PageResult.build(
                 paymentPage.getCurrent(),
@@ -52,31 +59,52 @@ public class PaymentController {
 
     @Operation(summary = "根据ID查询缴费记录")
     @GetMapping("/{id}")
-    public Result<Payment> getPaymentById(@PathVariable Long id) {
+    @RequireRole(roles = {1, 2}, description = "管理员和普通用户可查询缴费记录详情")
+    public Result<Payment> getPaymentById(@PathVariable Long id, HttpServletRequest request) {
         Payment payment = paymentService.getById(id);
+        if (payment == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_EXIST);
+        }
+        ensureOwnerOrAdmin(payment.getUserId(), request);
         return Result.success(payment);
     }
 
     @Operation(summary = "创建缴费记录")
     @PostMapping
     @RequireRole(roles = {1, 2}, description = "管理员和普通用户可创建缴费记录")
-    public Result<Boolean> createPayment(@Valid @RequestBody Payment payment) {
+    public Result<Boolean> createPayment(@Valid @RequestBody Payment payment, HttpServletRequest request) {
+        Integer currentUserType = getCurrentUserType(request);
+        if (currentUserType == 2) {
+            payment.setUserId(getCurrentUserId(request));
+        }
         boolean result = paymentService.createPayment(payment);
         return Result.success(result);
     }
 
     @Operation(summary = "支付")
     @PutMapping("/pay/{id}")
+    @RequireRole(roles = {1, 2}, description = "管理员和普通用户可支付，普通用户仅可支付自己的账单")
     public Result<Boolean> pay(
             @PathVariable Long id,
-            @RequestParam(required = false) Integer paymentMethod) {
+            @RequestParam(required = false) Integer paymentMethod,
+            HttpServletRequest request) {
+        Payment payment = paymentService.getById(id);
+        if (payment == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_EXIST);
+        }
+        ensureOwnerOrAdmin(payment.getUserId(), request);
         boolean result = paymentService.pay(id, paymentMethod);
         return Result.success(result);
     }
 
     @Operation(summary = "获取用户缴费统计")
     @GetMapping("/statistics")
-    public Result<Map<String, Object>> getUserStatistics(@RequestParam Long userId) {
+    @RequireRole(roles = {1, 2}, description = "管理员和普通用户可查询缴费统计，普通用户仅可查询本人")
+    public Result<Map<String, Object>> getUserStatistics(@RequestParam Long userId, HttpServletRequest request) {
+        Integer currentUserType = getCurrentUserType(request);
+        if (currentUserType == 2) {
+            userId = getCurrentUserId(request);
+        }
         Map<String, Object> stats = new HashMap<>();
         
         // 查询该用户所有缴费记录
@@ -123,6 +151,7 @@ public class PaymentController {
 
     @Operation(summary = "获取当前用户的未缴费提醒")
     @GetMapping("/unpaid/reminders")
+    @RequireRole(roles = {2}, description = "仅普通用户可查看自己的未缴费提醒")
     public Result<Map<String, Object>> getUnpaidReminders(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         
@@ -148,6 +177,32 @@ public class PaymentController {
         
         return Result.success(result);
     }
-}
 
+    private void ensureOwnerOrAdmin(Long ownerId, HttpServletRequest request) {
+        Integer userType = getCurrentUserType(request);
+        if (userType == 1) {
+            return;
+        }
+        Long currentUserId = getCurrentUserId(request);
+        if (!currentUserId.equals(ownerId)) {
+            throw new BusinessException(ResultCode.NO_PERMISSION);
+        }
+    }
+
+    private Long getCurrentUserId(HttpServletRequest request) {
+        Object userIdObj = request.getAttribute("userId");
+        if (userIdObj == null) {
+            throw new BusinessException(ResultCode.USER_NOT_LOGIN);
+        }
+        return Long.valueOf(userIdObj.toString());
+    }
+
+    private Integer getCurrentUserType(HttpServletRequest request) {
+        Object userTypeObj = request.getAttribute("userType");
+        if (userTypeObj == null) {
+            throw new BusinessException(ResultCode.USER_NOT_LOGIN);
+        }
+        return Integer.valueOf(userTypeObj.toString());
+    }
+}
 

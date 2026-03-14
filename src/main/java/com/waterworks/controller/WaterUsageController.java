@@ -5,13 +5,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
 import com.waterworks.common.Result;
+import com.waterworks.common.ResultCode;
 import com.waterworks.entity.WaterUsage;
+import com.waterworks.exception.BusinessException;
 import com.waterworks.service.WaterUsageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -31,13 +34,19 @@ public class WaterUsageController {
 
     @Operation(summary = "分页查询用水记录列表")
     @GetMapping("/page")
+    @RequireRole(roles = {1, 2, 3}, description = "管理员、普通用户、抄表员可查询用水记录")
     public Result<PageResult<WaterUsage>> getUsagePage(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) Long meterId,
             @RequestParam(required = false) String readMonth,
-            @RequestParam(required = false) Integer status) {
+            @RequestParam(required = false) Integer status,
+            HttpServletRequest request) {
+        Integer currentUserType = getCurrentUserType(request);
+        if (currentUserType == 2) {
+            userId = getCurrentUserId(request);
+        }
         Page<WaterUsage> usagePage = waterUsageService.getUsagePage(page, size, userId, meterId, readMonth, status);
         PageResult<WaterUsage> pageResult = PageResult.build(
                 usagePage.getCurrent(),
@@ -50,8 +59,16 @@ public class WaterUsageController {
 
     @Operation(summary = "根据ID查询用水记录")
     @GetMapping("/{id}")
-    public Result<WaterUsage> getUsageById(@PathVariable Long id) {
+    @RequireRole(roles = {1, 2, 3}, description = "管理员、普通用户、抄表员可查询用水记录详情")
+    public Result<WaterUsage> getUsageById(@PathVariable Long id, HttpServletRequest request) {
         WaterUsage waterUsage = waterUsageService.getById(id);
+        if (waterUsage == null) {
+            throw new BusinessException(ResultCode.DATA_NOT_EXIST);
+        }
+        Integer currentUserType = getCurrentUserType(request);
+        if (currentUserType == 2 && !getCurrentUserId(request).equals(waterUsage.getUserId())) {
+            throw new BusinessException(ResultCode.NO_PERMISSION);
+        }
         return Result.success(waterUsage);
     }
 
@@ -89,7 +106,12 @@ public class WaterUsageController {
 
     @Operation(summary = "获取用户用水统计")
     @GetMapping("/statistics")
-    public Result<Map<String, Object>> getUserStatistics(@RequestParam Long userId) {
+    @RequireRole(roles = {1, 2, 3}, description = "管理员、普通用户、抄表员可查询用水统计，普通用户仅可查询本人")
+    public Result<Map<String, Object>> getUserStatistics(@RequestParam Long userId, HttpServletRequest request) {
+        Integer currentUserType = getCurrentUserType(request);
+        if (currentUserType == 2) {
+            userId = getCurrentUserId(request);
+        }
         Map<String, Object> stats = new HashMap<>();
         
         // 查询该用户所有用水记录
@@ -123,6 +145,21 @@ public class WaterUsageController {
         
         return Result.success(stats);
     }
-}
 
+    private Long getCurrentUserId(HttpServletRequest request) {
+        Object userIdObj = request.getAttribute("userId");
+        if (userIdObj == null) {
+            throw new BusinessException(ResultCode.USER_NOT_LOGIN);
+        }
+        return Long.valueOf(userIdObj.toString());
+    }
+
+    private Integer getCurrentUserType(HttpServletRequest request) {
+        Object userTypeObj = request.getAttribute("userType");
+        if (userTypeObj == null) {
+            throw new BusinessException(ResultCode.USER_NOT_LOGIN);
+        }
+        return Integer.valueOf(userTypeObj.toString());
+    }
+}
 

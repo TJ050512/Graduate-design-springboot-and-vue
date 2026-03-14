@@ -4,13 +4,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.waterworks.annotation.RequireRole;
 import com.waterworks.common.PageResult;
 import com.waterworks.common.Result;
+import com.waterworks.common.ResultCode;
 import com.waterworks.entity.User;
+import com.waterworks.exception.BusinessException;
 import com.waterworks.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,10 +52,7 @@ public class UserController {
         String username = com.waterworks.utils.JwtUtil.getUsernameFromToken(token);
         // 根据用户名查询用户信息
         User user = userService.getUserByUsername(username);
-        if (user != null) {
-            // 清除密码敏感信息
-            user.setPassword(null);
-        }
+        sanitizeUser(user);
         return Result.success(user);
     }
 
@@ -66,6 +66,7 @@ public class UserController {
             @RequestParam(required = false) Integer userType,
             @RequestParam(required = false) Integer status) {
         Page<User> userPage = userService.getUserPage(page, size, username, userType, status);
+        userPage.getRecords().forEach(this::sanitizeUser);
         PageResult<User> pageResult = PageResult.build(
                 userPage.getCurrent(),
                 userPage.getSize(),
@@ -77,8 +78,11 @@ public class UserController {
 
     @Operation(summary = "根据ID查询用户")
     @GetMapping("/{id}")
-    public Result<User> getUserById(@PathVariable Long id) {
+    @RequireRole(roles = {1, 2, 3, 4}, description = "登录用户可查询用户信息，非管理员仅可查询本人")
+    public Result<User> getUserById(@PathVariable Long id, HttpServletRequest request) {
+        requireSelfOrAdmin(id, request);
         User user = userService.getById(id);
+        sanitizeUser(user);
         return Result.success(user);
     }
 
@@ -108,8 +112,9 @@ public class UserController {
 
     @Operation(summary = "修改密码")
     @PutMapping("/changePassword")
-    public Result<Boolean> changePassword(@RequestBody Map<String, String> passwordInfo) {
-        Long userId = Long.valueOf(passwordInfo.get("userId"));
+    @RequireRole(roles = {1, 2, 3, 4}, description = "登录用户可修改自己的密码")
+    public Result<Boolean> changePassword(@RequestBody Map<String, String> passwordInfo, HttpServletRequest request) {
+        Long userId = getCurrentUserId(request);
         String oldPassword = passwordInfo.get("oldPassword");
         String newPassword = passwordInfo.get("newPassword");
         boolean result = userService.changePassword(userId, oldPassword, newPassword);
@@ -123,6 +128,37 @@ public class UserController {
         boolean result = userService.resetPassword(id);
         return Result.success(result);
     }
-}
 
+    private void sanitizeUser(User user) {
+        if (user == null) {
+            return;
+        }
+        user.setPassword(null);
+        user.setSalt(null);
+    }
+
+    private void requireSelfOrAdmin(Long targetUserId, HttpServletRequest request) {
+        Integer userType = getCurrentUserType(request);
+        Long userId = getCurrentUserId(request);
+        if (userType != 1 && !userId.equals(targetUserId)) {
+            throw new BusinessException(ResultCode.NO_PERMISSION);
+        }
+    }
+
+    private Long getCurrentUserId(HttpServletRequest request) {
+        Object userIdObj = request.getAttribute("userId");
+        if (userIdObj == null) {
+            throw new BusinessException(ResultCode.USER_NOT_LOGIN);
+        }
+        return Long.valueOf(userIdObj.toString());
+    }
+
+    private Integer getCurrentUserType(HttpServletRequest request) {
+        Object userTypeObj = request.getAttribute("userType");
+        if (userTypeObj == null) {
+            throw new BusinessException(ResultCode.USER_NOT_LOGIN);
+        }
+        return Integer.valueOf(userTypeObj.toString());
+    }
+}
 

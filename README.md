@@ -218,7 +218,7 @@ graduate-design-springboot-and-vue/
 
 ## 环境要求
 
-- **JDK 21+**
+- **JDK 21（仅支持 21）**
 - **Maven 3.6+**
 - **MySQL 8.0+**
 - **Redis**（可选，已集成配置但当前业务未使用）
